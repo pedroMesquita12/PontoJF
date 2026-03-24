@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ajustes_ponto {
+  id                   BigInt              @id @default(autoincrement())
+  funcionario_id       BigInt
+  registro_ponto_id    BigInt?
+  tipo                 tipo_registro_ponto
+  data_referencia      DateTime            @db.Date
+  data_hora_sugerida   DateTime            @db.Timestamp(6)
+  motivo               String              @db.VarChar(150)
+  descricao            String
+  status               status_ajuste       @default(PENDENTE)
+  aprovado_por         BigInt?
+  aprovado_em          DateTime?           @db.Timestamp(6)
+  observacao_aprovador String?
+  created_at           DateTime            @default(now()) @db.Timestamp(6)
+  updated_at           DateTime            @default(now()) @db.Timestamp(6)
+  usuarios             usuarios?           @relation(fields: [aprovado_por], references: [id], onUpdate: NoAction, map: "fk_ajuste_aprovado_por")
+  funcionarios         funcionarios        @relation(fields: [funcionario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ajuste_funcionario")
+  registros_ponto      registros_ponto?    @relation(fields: [registro_ponto_id], references: [id], onUpdate: NoAction, map: "fk_ajuste_registro")
+
+  @@index([funcionario_id, data_referencia], map: "idx_ajustes_funcionario_data")
+}
+
+model auditoria {
+  id             BigInt    @id @default(autoincrement())
+  usuario_id     BigInt?
+  tabela_afetada String    @db.VarChar(100)
+  acao           String    @db.VarChar(20)
+  registro_id    BigInt?
+  detalhes       Json?
+  ip             String?   @db.VarChar(45)
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+  usuarios       usuarios? @relation(fields: [usuario_id], references: [id], onUpdate: NoAction, map: "fk_auditoria_usuario")
+
+  @@index([tabela_afetada, acao], map: "idx_auditoria_tabela_acao")
+  @@index([usuario_id], map: "idx_auditoria_usuario")
+}
+
+model cargos {
+  id           BigInt         @id @default(autoincrement())
+  nome         String         @unique @db.VarChar(100)
+  descricao    String?
+  created_at   DateTime       @default(now()) @db.Timestamp(6)
+  updated_at   DateTime       @default(now()) @db.Timestamp(6)
+  funcionarios funcionarios[]
+}
+
+model funcionarios {
+  id                   BigInt                 @id @default(autoincrement())
+  usuario_id           BigInt                 @unique
+  matricula            String                 @unique @db.VarChar(30)
+  cpf                  String                 @unique @db.VarChar(14)
+  telefone             String?                @db.VarChar(20)
+  data_nascimento      DateTime?              @db.Date
+  data_admissao        DateTime               @db.Date
+  status               status_funcionario     @default(ATIVO)
+  cargo_id             BigInt?
+  setor_id             BigInt?
+  supervisor_id        BigInt?
+  turno_nome           String?                @db.VarChar(50)
+  carga_horaria_diaria Decimal?               @default(8.00) @db.Decimal(4, 2)
+  tolerancia_minutos   Int                    @default(10)
+  endereco             String?                @db.VarChar(255)
+  cidade               String?                @db.VarChar(100)
+  estado               String?                @db.VarChar(2)
+  cep                  String?                @db.VarChar(9)
+  observacoes          String?
+  created_at           DateTime               @default(now()) @db.Timestamp(6)
+  updated_at           DateTime               @default(now()) @db.Timestamp(6)
+  ajustes_ponto        ajustes_ponto[]
+  cargos               cargos?                @relation(fields: [cargo_id], references: [id], onUpdate: NoAction, map: "fk_funcionario_cargo")
+  setores              setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction, map: "fk_funcionario_setor")
+  funcionarios         funcionarios?          @relation("funcionariosTofuncionarios", fields: [supervisor_id], references: [id], onUpdate: NoAction, map: "fk_funcionario_supervisor")
+  other_funcionarios   funcionarios[]         @relation("funcionariosTofuncionarios")
+  usuarios             usuarios               @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_funcionario_usuario")
+  jornadas_trabalho    jornadas_trabalho[]
+  justificativas_ponto justificativas_ponto[]
+  registros_ponto      registros_ponto[]
+
+  @@index([cpf], map: "idx_funcionarios_cpf")
+  @@index([matricula], map: "idx_funcionarios_matricula")
+  @@index([setor_id], map: "idx_funcionarios_setor")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model jornadas_trabalho {
+  id                     BigInt       @id @default(autoincrement())
+  funcionario_id         BigInt
+  dia_semana             Int          @db.SmallInt
+  hora_entrada           DateTime?    @db.Time(6)
+  hora_saida_almoco      DateTime?    @db.Time(6)
+  hora_volta_almoco      DateTime?    @db.Time(6)
+  hora_saida             DateTime?    @db.Time(6)
+  carga_horaria_prevista Decimal?     @default(8.00) @db.Decimal(4, 2)
+  folga                  Boolean      @default(false)
+  created_at             DateTime     @default(now()) @db.Timestamp(6)
+  updated_at             DateTime     @default(now()) @db.Timestamp(6)
+  funcionarios           funcionarios @relation(fields: [funcionario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_jornada_funcionario")
+
+  @@unique([funcionario_id, dia_semana], map: "uq_jornada_funcionario_dia")
+}
+
+model justificativas_ponto {
+  id                BigInt               @id @default(autoincrement())
+  funcionario_id    BigInt
+  data_referencia   DateTime             @db.Date
+  motivo            String               @db.VarChar(150)
+  descricao         String
+  status            status_justificativa @default(PENDENTE)
+  analisado_por     BigInt?
+  analisado_em      DateTime?            @db.Timestamp(6)
+  observacao_gestor String?
+  created_at        DateTime             @default(now()) @db.Timestamp(6)
+  updated_at        DateTime             @default(now()) @db.Timestamp(6)
+  usuarios          usuarios?            @relation(fields: [analisado_por], references: [id], onUpdate: NoAction, map: "fk_justificativa_analisado_por")
+  funcionarios      funcionarios         @relation(fields: [funcionario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_justificativa_funcionario")
+
+  @@index([funcionario_id, data_referencia], map: "idx_justificativas_funcionario_data")
+}
+
+model registros_ponto {
+  id                  BigInt              @id @default(autoincrement())
+  funcionario_id      BigInt
+  tipo                tipo_registro_ponto
+  data_hora           DateTime            @default(now()) @db.Timestamp(6)
+  data_referencia     DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
+  latitude            Decimal?            @db.Decimal(10, 7)
+  longitude           Decimal?            @db.Decimal(10, 7)
+  endereco_referencia String?             @db.VarChar(255)
+  ip_registro         String?             @db.VarChar(45)
+  dispositivo         String?             @db.VarChar(150)
+  navegador           String?             @db.VarChar(150)
+  observacao          String?
+  origem              String?             @default("WEB") @db.VarChar(30)
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime            @default(now()) @db.Timestamp(6)
+  ajustes_ponto       ajustes_ponto[]
+  funcionarios        funcionarios        @relation(fields: [funcionario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registro_funcionario")
+
+  @@unique([funcionario_id, tipo, data_hora], map: "uq_registro_unico")
+  @@index([data_referencia], map: "idx_registros_ponto_data_referencia")
+  @@index([funcionario_id], map: "idx_registros_ponto_funcionario")
+  @@index([funcionario_id, data_referencia], map: "idx_registros_ponto_funcionario_data")
+}
+
+model setores {
+  id           BigInt         @id @default(autoincrement())
+  nome         String         @unique @db.VarChar(100)
+  descricao    String?
+  created_at   DateTime       @default(now()) @db.Timestamp(6)
+  updated_at   DateTime       @default(now()) @db.Timestamp(6)
+  funcionarios funcionarios[]
+}
+
+model usuarios {
+  id                   BigInt                 @id @default(autoincrement())
+  nome                 String                 @db.VarChar(150)
+  email                String                 @unique @db.VarChar(150)
+  senha_hash           String
+  perfil               tipo_perfil            @default(FUNCIONARIO)
+  ultimo_login         DateTime?              @db.Timestamp(6)
+  ativo                Boolean                @default(true)
+  created_at           DateTime               @default(now()) @db.Timestamp(6)
+  updated_at           DateTime               @default(now()) @db.Timestamp(6)
+  ajustes_ponto        ajustes_ponto[]
+  auditoria            auditoria[]
+  funcionarios         funcionarios?
+  justificativas_ponto justificativas_ponto[]
+
+  @@index([email], map: "idx_usuarios_email")
+}
+
+enum status_ajuste {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+enum status_funcionario {
+  ATIVO
+  INATIVO
+  AFASTADO
+  FERIAS
+}
+
+enum status_justificativa {
+  PENDENTE
+  APROVADA
+  REJEITADA
+}
+
+enum tipo_perfil {
+  ADMIN
+  GESTOR
+  RH
+  FUNCIONARIO
+}
+
+enum tipo_registro_ponto {
+  ENTRADA
+  SAIDA_ALMOCO
+  VOLTA_ALMOCO
+  SAIDA
+}
