@@ -8,3 +8,4 @@ dist/
 .env
 backend/.env
 frontend/.env
+backend/dist/

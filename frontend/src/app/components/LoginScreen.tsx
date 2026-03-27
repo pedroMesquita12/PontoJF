@@ -8,29 +8,27 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 
 type UserData = {
+  id: number;
+  usuarioId: number;
   matricula: string;
   nome: string;
+  email: string;
   cargo: string;
+  perfil: string;
 };
 
 type LoginScreenProps = {
   onLogin: (user: UserData) => void;
 };
 
-// Mock database de usuários
-const mockUsers: Record<string, { senha: string; nome: string; cargo: string }> = {
-  "001": { senha: "123456", nome: "João Silva", cargo: "Entregador" },
-  "002": { senha: "123456", nome: "Maria Santos", cargo: "Motorista" },
-  "003": { senha: "123456", nome: "Pedro Oliveira", cargo: "Supervisor" },
-  "004": { senha: "123456", nome: "Ana Costa", cargo: "Entregadora" },
-};
+const API_URL = "/api";
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [matricula, setMatricula] = useState("");
   const [senha, setSenha] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!matricula || !senha) {
@@ -38,32 +36,47 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       return;
     }
 
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    // Simular delay de autenticação
-    setTimeout(() => {
-      const user = mockUsers[matricula];
+      const response = await fetch(`${API_URL}/auth/login`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    matricula,
+    senha,
+  }),
+});
 
-      if (!user) {
-        toast.error("Matrícula não encontrada");
-        setIsLoading(false);
-        return;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao fazer login");
       }
 
-      if (user.senha !== senha) {
-        toast.error("Senha incorreta");
-        setIsLoading(false);
-        return;
-      }
+      const user: UserData = {
+        id: data.user.id,
+        usuarioId: data.user.usuarioId,
+        matricula: data.user.matricula,
+        nome: data.user.nome,
+        email: data.user.email,
+        cargo: data.user.cargo ?? "Funcionário",
+        perfil: data.user.perfil,
+      };
+
+      localStorage.setItem("user", JSON.stringify(user));
 
       toast.success(`Bem-vindo(a), ${user.nome}!`);
-      onLogin({
-        matricula,
-        nome: user.nome,
-        cargo: user.cargo,
-      });
+      onLogin(user);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao fazer login";
+      toast.error(message);
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -74,7 +87,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md"
       >
-        {/* Logo / Header */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
@@ -84,11 +96,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           >
             <Package className="size-12" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Express Encomendas</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Express Encomendas
+          </h1>
           <p className="text-slate-600">Sistema de Ponto Eletrônico</p>
         </div>
 
-        {/* Login Card */}
         <Card>
           <CardHeader>
             <CardTitle>Acesso ao Sistema</CardTitle>
@@ -152,22 +165,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </form>
           </CardContent>
         </Card>
-
-        {/* Demo Info */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
-        >
-          <p className="text-sm text-blue-900 font-medium mb-2">Usuários de demonstração:</p>
-          <div className="text-xs text-blue-800 space-y-1">
-            <p>• Matrícula: <span className="font-mono font-semibold">001</span> | Senha: <span className="font-mono font-semibold">123456</span> (João Silva - Entregador)</p>
-            <p>• Matrícula: <span className="font-mono font-semibold">002</span> | Senha: <span className="font-mono font-semibold">123456</span> (Maria Santos - Motorista)</p>
-            <p>• Matrícula: <span className="font-mono font-semibold">003</span> | Senha: <span className="font-mono font-semibold">123456</span> (Pedro Oliveira - Supervisor)</p>
-            <p>• Matrícula: <span className="font-mono font-semibold">004</span> | Senha: <span className="font-mono font-semibold">123456</span> (Ana Costa - Entregadora)</p>
-          </div>
-        </motion.div>
       </motion.div>
     </div>
   );

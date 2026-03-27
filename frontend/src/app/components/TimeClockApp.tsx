@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -14,21 +14,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { 
-  Clock, 
-  LogIn, 
-  LogOut, 
-  Coffee, 
-  User, 
+import {
+  Clock,
+  LogIn,
+  LogOut,
+  Coffee,
+  User,
   Calendar,
   Package,
   Timer,
   CheckCircle2,
   AlertCircle,
-  Power
+  Power,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+
+const API_URL =
+  "/api";
 
 type TimeEntry = {
   id: string;
@@ -36,12 +39,22 @@ type TimeEntry = {
   timestamp: Date;
 };
 
+type ApiTimeEntry = {
+  id: number | string;
+  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO";
+  data_hora: string;
+};
+
 type WorkStatus = "fora" | "trabalhando" | "pausa";
 
 type UserData = {
+  id: number;
+  usuarioId: number;
   matricula: string;
   nome: string;
+  email: string;
   cargo: string;
+  perfil: string;
 };
 
 type TimeClockAppProps = {
@@ -50,14 +63,20 @@ type TimeClockAppProps = {
   hideHeader?: boolean;
 };
 
-export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClockAppProps) {
+export function TimeClockApp({
+  userData,
+  onLogout,
+  hideHeader = false,
+}: TimeClockAppProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [workStatus, setWorkStatus] = useState<WorkStatus>("fora");
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [workedTime, setWorkedTime] = useState(0);
   const [pauseTime, setPauseTime] = useState(0);
 
-  // Mock delivery data
+  // Ajuste aqui depois quando tiver o ID real do funcionário logado
+  const funcionarioId = userData.id;
+
   const deliveriesToday = 12;
 
   useEffect(() => {
@@ -80,6 +99,10 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
     return () => clearInterval(interval);
   }, [workStatus]);
 
+  useEffect(() => {
+    carregarPontos();
+  }, []);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
@@ -101,33 +124,101 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleClockIn = () => {
-    const entry: TimeEntry = {
-      id: crypto.randomUUID(),
-      type: "entrada",
-      timestamp: new Date(),
+  const mapApiEntriesToUi = (entries: ApiTimeEntry[]): TimeEntry[] => {
+  return entries.map((entry) => {
+    let type: TimeEntry["type"] = "entrada";
+
+    if (entry.tipo === "ENTRADA") type = "entrada";
+    else if (entry.tipo === "SAIDA") type = "saida";
+    else if (entry.tipo === "SAIDA_ALMOCO") type = "pausa_inicio";
+    else if (entry.tipo === "VOLTA_ALMOCO") type = "pausa_fim";
+
+    return {
+      id: String(entry.id),
+      type,
+      timestamp: new Date(entry.data_hora),
     };
-    setTimeEntries([...timeEntries, entry]);
-    setWorkStatus("trabalhando");
-    toast.success("Entrada registrada com sucesso!", {
-      description: formatTime(entry.timestamp),
-    });
+  });
+};
+
+  const carregarPontos = async () => {
+    try {
+      const response = await fetch(`/api/ponto/${funcionarioId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao buscar registros");
+      }
+
+      const registros = mapApiEntriesToUi(data);
+      setTimeEntries(registros);
+
+      if (registros.length > 0) {
+        const ultimo = registros[0];
+        if (ultimo.type === "entrada") {
+          setWorkStatus("trabalhando");
+        } else if (ultimo.type === "saida") {
+          setWorkStatus("fora");
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao carregar registros");
+    }
   };
 
-  const handleClockOut = () => {
-    const entry: TimeEntry = {
-      id: crypto.randomUUID(),
-      type: "saida",
-      timestamp: new Date(),
-    };
-    setTimeEntries([...timeEntries, entry]);
-    setWorkStatus("fora");
-    toast.success("Saída registrada com sucesso!", {
-      description: formatTime(entry.timestamp),
+  const registrarPonto = async (tipo: "ENTRADA" | "SAIDA") => {
+    const response = await fetch(`/api/ponto/registrar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ funcionarioId, tipo }),
     });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Erro ao registrar ponto");
+    }
+
+    return data;
+  };
+
+  const handleClockIn = async () => {
+    try {
+      await registrarPonto("ENTRADA");
+      await carregarPontos();
+      setWorkStatus("trabalhando");
+
+      toast.success("Entrada registrada com sucesso!", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível registrar a entrada");
+    }
+  };
+
+  const handleClockOut = async () => {
+    try {
+      await registrarPonto("SAIDA");
+      await carregarPontos();
+      setWorkStatus("fora");
+
+      toast.success("Saída registrada com sucesso!", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível registrar a saída");
+    }
   };
 
   const handlePauseStart = () => {
@@ -136,8 +227,10 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
       type: "pausa_inicio",
       timestamp: new Date(),
     };
-    setTimeEntries([...timeEntries, entry]);
+
+    setTimeEntries((prev) => [entry, ...prev]);
     setWorkStatus("pausa");
+
     toast.info("Pausa iniciada", {
       description: formatTime(entry.timestamp),
     });
@@ -149,8 +242,10 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
       type: "pausa_fim",
       timestamp: new Date(),
     };
-    setTimeEntries([...timeEntries, entry]);
+
+    setTimeEntries((prev) => [entry, ...prev]);
     setWorkStatus("trabalhando");
+
     toast.info("Pausa finalizada", {
       description: formatTime(entry.timestamp),
     });
@@ -210,39 +305,49 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
 
   return (
     <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
+      <div className="mx-auto max-w-6xl space-y-6">
         {!hideHeader && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-600 text-white p-3 rounded-lg">
+              <div className="rounded-lg bg-blue-600 p-3 text-white">
                 <Package className="size-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Express Encomendas</h1>
-                <p className="text-sm text-slate-600">Sistema de Ponto Eletrônico</p>
+                <h1 className="text-2xl font-bold text-slate-900">
+                  Express Encomendas
+                </h1>
+                <p className="text-sm text-slate-600">
+                  Sistema de Ponto Eletrônico
+                </p>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
               {getStatusBadge()}
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-600 border-red-600 hover:bg-red-50"
+                    className="border-red-600 text-red-600 hover:bg-red-50"
                   >
                     <Power className="mr-2 size-4" />
                     Sair
                   </Button>
                 </AlertDialogTrigger>
+
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar saída do sistema</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      Confirmar saída do sistema
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      Tem certeza que deseja sair do sistema? Você precisará fazer login novamente para acessar.
+                      Tem certeza que deseja sair do sistema? Você precisará
+                      fazer login novamente para acessar.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
@@ -258,35 +363,40 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
           </div>
         )}
 
-        {/* User Info Card */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="bg-slate-200 rounded-full p-3">
+                <div className="rounded-full bg-slate-200 p-3">
                   <User className="size-8 text-slate-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">{userData.nome}</h2>
-                  <p className="text-slate-600">{userData.cargo} • Matrícula: {userData.matricula}</p>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    {userData.nome}
+                  </h2>
+                  <p className="text-slate-600">
+                    {userData.cargo} • Matrícula: {userData.matricula}
+                  </p>
                 </div>
               </div>
+
               <div className="text-right">
-                <div className="flex items-center gap-2 text-slate-600 mb-1">
+                <div className="mb-1 flex items-center gap-2 text-slate-600">
                   <Calendar className="size-4" />
                   <span className="text-sm">{formatDate(currentTime)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-blue-600">
                   <Package className="size-4" />
-                  <span className="text-sm font-medium">{deliveriesToday} entregas hoje</span>
+                  <span className="text-sm font-medium">
+                    {deliveriesToday} entregas hoje
+                  </span>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Clock Card */}
+        <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -294,6 +404,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                 Relógio
               </CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-6">
               <motion.div
                 className="text-center"
@@ -301,7 +412,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="text-6xl font-bold text-slate-900 mb-2 font-mono">
+                <div className="mb-2 font-mono text-6xl font-bold text-slate-900">
                   {formatTime(currentTime)}
                 </div>
                 <div className="text-slate-600">{formatDate(currentTime)}</div>
@@ -309,7 +420,6 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
 
               <Separator />
 
-              {/* Action Buttons */}
               <div className="space-y-3">
                 <AnimatePresence mode="wait">
                   {workStatus === "fora" && (
@@ -321,7 +431,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                     >
                       <Button
                         onClick={handleClockIn}
-                        className="w-full bg-green-600 hover:bg-green-700 h-14 text-lg"
+                        className="h-14 w-full bg-green-600 text-lg hover:bg-green-700"
                       >
                         <LogIn className="mr-2 size-5" />
                         Registrar Entrada
@@ -339,7 +449,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                     >
                       <Button
                         onClick={handlePauseStart}
-                        className="w-full bg-yellow-500 hover:bg-yellow-600 h-14 text-lg"
+                        className="h-14 w-full bg-yellow-500 text-lg hover:bg-yellow-600"
                       >
                         <Coffee className="mr-2 size-5" />
                         Iniciar Pausa
@@ -347,7 +457,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                       <Button
                         onClick={handleClockOut}
                         variant="outline"
-                        className="w-full border-red-600 text-red-600 hover:bg-red-50 h-14 text-lg"
+                        className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
                       >
                         <LogOut className="mr-2 size-5" />
                         Registrar Saída
@@ -365,7 +475,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                     >
                       <Button
                         onClick={handlePauseEnd}
-                        className="w-full bg-blue-600 hover:bg-blue-700 h-14 text-lg"
+                        className="h-14 w-full bg-blue-600 text-lg hover:bg-blue-700"
                       >
                         <CheckCircle2 className="mr-2 size-5" />
                         Finalizar Pausa
@@ -373,7 +483,7 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                       <Button
                         onClick={handleClockOut}
                         variant="outline"
-                        className="w-full border-red-600 text-red-600 hover:bg-red-50 h-14 text-lg"
+                        className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
                       >
                         <LogOut className="mr-2 size-5" />
                         Registrar Saída
@@ -385,7 +495,6 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
             </CardContent>
           </Card>
 
-          {/* Stats Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -393,17 +502,23 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
                 Resumo do Dia
               </CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                  <div className="text-sm text-green-700 mb-1">Tempo Trabalhado</div>
-                  <div className="text-2xl font-bold text-green-900 font-mono">
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="mb-1 text-sm text-green-700">
+                    Tempo Trabalhado
+                  </div>
+                  <div className="font-mono text-2xl font-bold text-green-900">
                     {formatDuration(workedTime)}
                   </div>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                  <div className="text-sm text-yellow-700 mb-1">Tempo de Pausa</div>
-                  <div className="text-2xl font-bold text-yellow-900 font-mono">
+
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                  <div className="mb-1 text-sm text-yellow-700">
+                    Tempo de Pausa
+                  </div>
+                  <div className="font-mono text-2xl font-bold text-yellow-900">
                     {formatDuration(pauseTime)}
                   </div>
                 </div>
@@ -411,37 +526,37 @@ export function TimeClockApp({ userData, onLogout, hideHeader = false }: TimeClo
 
               <Separator />
 
-              {/* History */}
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Histórico de Hoje</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <h3 className="mb-3 font-semibold text-slate-900">
+                  Histórico de Hoje
+                </h3>
+
+                <div className="max-h-64 space-y-2 overflow-y-auto">
                   {timeEntries.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500">
-                      <Clock className="size-12 mx-auto mb-2 opacity-50" />
+                    <div className="py-8 text-center text-slate-500">
+                      <Clock className="mx-auto mb-2 size-12 opacity-50" />
                       <p>Nenhum registro hoje</p>
                     </div>
                   ) : (
-                    timeEntries
-                      .slice()
-                      .reverse()
-                      .map((entry) => (
-                        <motion.div
-                          key={entry.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            {getEntryIcon(entry.type)}
-                            <span className="font-medium text-slate-900">
-                              {getEntryLabel(entry.type)}
-                            </span>
-                          </div>
-                          <span className="text-sm text-slate-600 font-mono">
-                            {formatTime(entry.timestamp)}
+                    timeEntries.map((entry) => (
+                      <motion.div
+                        key={entry.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          {getEntryIcon(entry.type)}
+                          <span className="font-medium text-slate-900">
+                            {getEntryLabel(entry.type)}
                           </span>
-                        </motion.div>
-                      ))
+                        </div>
+
+                        <span className="font-mono text-sm text-slate-600">
+                          {formatTime(entry.timestamp)}
+                        </span>
+                      </motion.div>
+                    ))
                   )}
                 </div>
               </div>
