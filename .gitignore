@@ -1,11 +1,21 @@
+# dependencies
 node_modules/
-backend/node_modules/
-frontend/node_modules/
 
+# build
 dist/
-.vscode/
+backend/dist/
+frontend/dist/
 
+# environment
 .env
 backend/.env
 frontend/.env
-backend/dist/
+
+# editor
+.vscode/
+
+# logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
