@@ -10,6 +10,22 @@ export class PontoService {
     private readonly whatsappService: WhatsappService,
   ) {}
 
+  private readonly locaisPermitidos = [
+    {
+      nome: 'Unidade 1',
+      latitude: -22.9768652,
+      longitude: -49.8795224,
+      raio: 1500,
+    },
+    {
+      nome: 'Unidade 2',
+      latitude: -22.974029,
+      longitude: -49.868587,
+      raio: 1500,
+    },
+  ];
+
+
   private formatarDuracao(ms: number): string {
     if (ms <= 0) {
       return '0min';
@@ -30,9 +46,72 @@ export class PontoService {
     return `${horas}h ${minutos}min`;
   }
 
-  async registrarPonto(funcionarioId: number, tipo: string) {
+  private calcularDistancia(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const R = 6371000;
+    const toRad = (value: number) => (value * Math.PI) / 180;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }
+
+  private encontrarLocalMaisProximo(latitude: number, longitude: number) {
+    let localMaisProximo: {
+      nome: string;
+      latitude: number;
+      longitude: number;
+      raio: number;
+    } | null = null;
+
+    let menorDistancia = Infinity;
+
+    for (const local of this.locaisPermitidos) {
+      const distancia = this.calcularDistancia(
+        latitude,
+        longitude,
+        local.latitude,
+        local.longitude,
+      );
+
+      if (distancia < menorDistancia) {
+        menorDistancia = distancia;
+        localMaisProximo = local;
+      }
+    }
+
+    return {
+      local: localMaisProximo,
+      distancia: menorDistancia,
+    };
+  }
+
+  async registrarPonto(
+    funcionarioId: number,
+    tipo: string,
+    latitude?: number,
+    longitude?: number,
+  ) {
     try {
-      console.log('REGISTRAR PONTO:', { funcionarioId, tipo });
+      console.log('REGISTRAR PONTO:', {
+        funcionarioId,
+        tipo,
+        latitude,
+        longitude,
+      });
 
       const tiposValidos = [
         'ENTRADA',
@@ -45,6 +124,32 @@ export class PontoService {
 
       if (!tiposValidos.includes(tipoNormalizado)) {
         throw new BadRequestException('Tipo de ponto inválido');
+      }
+
+      if (latitude == null || longitude == null) {
+        throw new BadRequestException('Localização não informada');
+      }
+
+      const resultadoLocal = this.encontrarLocalMaisProximo(
+        latitude,
+        longitude,
+      );
+
+      if (!resultadoLocal.local) {
+        throw new BadRequestException(
+          'Nenhum local permitido foi encontrado',
+        );
+      }
+
+      console.log('LOCAL MAIS PRÓXIMO:', resultadoLocal.local.nome);
+      console.log('DISTÂNCIA ATÉ O LOCAL:', resultadoLocal.distancia);
+      const nomeLocal = resultadoLocal.local.nome;
+      if (resultadoLocal.distancia > resultadoLocal.local.raio) {
+        throw new BadRequestException(
+          `Você está fora da área permitida para registrar ponto. Local mais próximo: ${
+            resultadoLocal.local.nome
+          } (${Math.round(resultadoLocal.distancia)}m)`,
+        );
       }
 
       const funcionario = await this.prisma.funcionarios.findUnique({
@@ -67,6 +172,9 @@ export class PontoService {
           funcionario_id: BigInt(funcionarioId),
           tipo: tipoNormalizado,
           data_hora: agora,
+          latitude,
+          longitude,
+          observacao: `Local do ponto: ${resultadoLocal.local.nome}`,
         },
       });
 
@@ -107,12 +215,15 @@ export class PontoService {
       }
 
       try {
-        await this.whatsappService.enviarMensagemRegistroPonto({
-          nome: funcionario.usuarios.nome,
-          tipo: tipoNormalizado,
-          horario: horarioFormatado,
-          tempo: tempoTrabalhado,
-        });
+        const linkMapa = `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+await this.whatsappService.enviarMensagemRegistroPonto({
+  nome: funcionario.usuarios.nome,
+  tipo: tipoNormalizado,
+  horario: horarioFormatado,
+  tempo: tempoTrabalhado,
+  local: `${resultadoLocal.local.nome} | ${linkMapa}`,
+});
 
         console.log('WHATSAPP ENVIADO COM SUCESSO');
       } catch (erroWhatsapp) {

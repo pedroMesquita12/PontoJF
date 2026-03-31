@@ -174,22 +174,53 @@ export function TimeClockApp({
   };
 
   const registrarPonto = async (tipo: "ENTRADA" | "SAIDA") => {
-    const response = await fetch(`/api/ponto/registrar`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+  if (!navigator.geolocation) {
+    throw new Error("Geolocalização não suportada neste navegador");
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+
+          const response = await fetch(`/api/ponto/registrar`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              funcionarioId,
+              tipo,
+              latitude,
+              longitude,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            reject(new Error(data.message || "Erro ao registrar ponto"));
+            return;
+          }
+
+          resolve(data);
+        } catch (error) {
+          reject(error);
+        }
       },
-      body: JSON.stringify({ funcionarioId, tipo }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao registrar ponto");
-    }
-
-    return data;
-  };
+      (error) => {
+        reject(new Error("Não foi possível obter a localização"));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  });
+};
 
   const handleClockIn = async () => {
     try {

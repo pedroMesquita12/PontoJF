@@ -7,6 +7,7 @@ export class WhatsappService {
     tipo: string;
     horario: string;
     tempo: string;
+    local: string; // 👈 NOVO
   }) {
     const token = process.env.WHATSAPP_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -29,7 +30,7 @@ export class WhatsappService {
         template: {
           name: 'registro_ponto_alerta',
           language: {
-            code: 'pt_BR',
+            code: 'pt-BR',
           },
           components: [
             {
@@ -39,6 +40,7 @@ export class WhatsappService {
                 { type: 'text', text: params.tipo },
                 { type: 'text', text: params.horario },
                 { type: 'text', text: params.tempo },
+                { type: 'text', text: params.local }, // 👈 NOVO
               ],
             },
           ],
