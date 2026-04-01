@@ -3,6 +3,13 @@ import { tipo_registro_ponto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 
+type LocalPermitido = {
+  nome: string;
+  latitude: number;
+  longitude: number;
+  raio: number;
+};
+
 @Injectable()
 export class PontoService {
   constructor(
@@ -10,40 +17,63 @@ export class PontoService {
     private readonly whatsappService: WhatsappService,
   ) {}
 
-  private readonly locaisPermitidos = [
+  // Troque pelas coordenadas exatas copiadas do pin do Google Maps.
+  // Não preenchi coordenadas novas aqui para não inventar valores.
+  private readonly locaisPermitidos: LocalPermitido[] = [
     {
-      nome: 'Unidade 1',
+      nome: 'Unidade 1 - Rua Abuassali Abujamra, 209',
       latitude: -22.9768652,
       longitude: -49.8795224,
-      raio: 1500,
+      raio: 300,
     },
     {
-      nome: 'Unidade 2',
+      nome: 'Unidade 2 - Rua Amazonas, 530',
       latitude: -22.974029,
       longitude: -49.868587,
-      raio: 1500,
+      raio: 300,
     },
   ];
 
-
   private formatarDuracao(ms: number): string {
-    if (ms <= 0) {
-      return '0min';
-    }
+    if (ms <= 0) return '0min';
 
     const totalMinutos = Math.floor(ms / 1000 / 60);
     const horas = Math.floor(totalMinutos / 60);
     const minutos = totalMinutos % 60;
 
-    if (horas === 0) {
-      return `${minutos}min`;
-    }
-
-    if (minutos === 0) {
-      return `${horas}h`;
-    }
+    if (horas === 0) return `${minutos}min`;
+    if (minutos === 0) return `${horas}h`;
 
     return `${horas}h ${minutos}min`;
+  }
+
+  private normalizarCoordenada(valor: number, tipo: 'latitude' | 'longitude'): number {
+    const numero = Number(valor);
+
+    if (!Number.isFinite(numero)) {
+      throw new BadRequestException(`${tipo} inválida`);
+    }
+
+    if (tipo === 'latitude' && (numero < -90 || numero > 90)) {
+      throw new BadRequestException('Latitude fora do intervalo válido');
+    }
+
+    if (tipo === 'longitude' && (numero < -180 || numero > 180)) {
+      throw new BadRequestException('Longitude fora do intervalo válido');
+    }
+
+    return Number(numero.toFixed(8));
+  }
+
+  private validarCoordenadas(latitude?: number, longitude?: number) {
+    if (latitude == null || longitude == null) {
+      throw new BadRequestException('Localização não informada');
+    }
+
+    const lat = this.normalizarCoordenada(latitude, 'latitude');
+    const lng = this.normalizarCoordenada(longitude, 'longitude');
+
+    return { lat, lng };
   }
 
   private calcularDistancia(
@@ -70,13 +100,7 @@ export class PontoService {
   }
 
   private encontrarLocalMaisProximo(latitude: number, longitude: number) {
-    let localMaisProximo: {
-      nome: string;
-      latitude: number;
-      longitude: number;
-      raio: number;
-    } | null = null;
-
+    let localMaisProximo: LocalPermitido | null = null;
     let menorDistancia = Infinity;
 
     for (const local of this.locaisPermitidos) {
@@ -99,19 +123,39 @@ export class PontoService {
     };
   }
 
+  private montarLinkMapa(latitude: number, longitude: number) {
+    return `https://www.google.com/maps?q=${latitude},${longitude}`;
+  }
+
   async registrarPonto(
     funcionarioId: number,
     tipo: string,
     latitude?: number,
     longitude?: number,
+    accuracy?: number,
   ) {
     try {
+      const { lat, lng } = this.validarCoordenadas(latitude, longitude);
+      const accuracyNormalizada =
+        accuracy == null || Number.isNaN(Number(accuracy))
+          ? null
+          : Number(Number(accuracy).toFixed(2));
+
       console.log('REGISTRAR PONTO:', {
         funcionarioId,
         tipo,
-        latitude,
-        longitude,
+        latitudeOriginal: latitude,
+        longitudeOriginal: longitude,
+        latitudeNormalizada: lat,
+        longitudeNormalizada: lng,
+        accuracy: accuracyNormalizada,
       });
+
+      if (accuracyNormalizada != null && accuracyNormalizada > 100) {
+        throw new BadRequestException(
+          `Localização imprecisa (${Math.round(accuracyNormalizada)}m). Ative o GPS e tente novamente.`,
+        );
+      }
 
       const tiposValidos = [
         'ENTRADA',
@@ -126,24 +170,15 @@ export class PontoService {
         throw new BadRequestException('Tipo de ponto inválido');
       }
 
-      if (latitude == null || longitude == null) {
-        throw new BadRequestException('Localização não informada');
-      }
-
-      const resultadoLocal = this.encontrarLocalMaisProximo(
-        latitude,
-        longitude,
-      );
+      const resultadoLocal = this.encontrarLocalMaisProximo(lat, lng);
 
       if (!resultadoLocal.local) {
-        throw new BadRequestException(
-          'Nenhum local permitido foi encontrado',
-        );
+        throw new BadRequestException('Nenhum local permitido foi encontrado');
       }
 
       console.log('LOCAL MAIS PRÓXIMO:', resultadoLocal.local.nome);
-      console.log('DISTÂNCIA ATÉ O LOCAL:', resultadoLocal.distancia);
-      const nomeLocal = resultadoLocal.local.nome;
+      console.log('DISTÂNCIA ATÉ O LOCAL:', Math.round(resultadoLocal.distancia), 'm');
+
       if (resultadoLocal.distancia > resultadoLocal.local.raio) {
         throw new BadRequestException(
           `Você está fora da área permitida para registrar ponto. Local mais próximo: ${
@@ -172,20 +207,17 @@ export class PontoService {
           funcionario_id: BigInt(funcionarioId),
           tipo: tipoNormalizado,
           data_hora: agora,
-          latitude,
-          longitude,
+          latitude: lat,
+          longitude: lng,
           observacao: `Local do ponto: ${resultadoLocal.local.nome}`,
         },
       });
 
       console.log('PONTO SALVO:', resultado);
 
-      const horarioFormatado = new Date(resultado.data_hora).toLocaleString(
-        'pt-BR',
-        {
-          timeZone: 'America/Sao_Paulo',
-        },
-      );
+      const horarioFormatado = new Date(resultado.data_hora).toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+      });
 
       let tempoTrabalhado = 'Ainda não calculado';
 
@@ -215,15 +247,15 @@ export class PontoService {
       }
 
       try {
-        const linkMapa = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        const linkMapa = this.montarLinkMapa(lat, lng);
 
-await this.whatsappService.enviarMensagemRegistroPonto({
-  nome: funcionario.usuarios.nome,
-  tipo: tipoNormalizado,
-  horario: horarioFormatado,
-  tempo: tempoTrabalhado,
-  local: `${resultadoLocal.local.nome} | ${linkMapa}`,
-});
+        await this.whatsappService.enviarMensagemRegistroPonto({
+          nome: funcionario.usuarios.nome,
+          tipo: tipoNormalizado,
+          horario: horarioFormatado,
+          tempo: tempoTrabalhado,
+          local: `${resultadoLocal.local.nome} | ${linkMapa}`,
+        });
 
         console.log('WHATSAPP ENVIADO COM SUCESSO');
       } catch (erroWhatsapp) {

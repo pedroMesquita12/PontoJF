@@ -30,7 +30,7 @@ export class WhatsappService {
         template: {
           name: 'registro_ponto_alerta',
           language: {
-            code: 'pt-BR',
+            code: 'pt_BR',
           },
           components: [
             {
