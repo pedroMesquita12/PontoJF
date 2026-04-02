@@ -30,9 +30,6 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
-const API_URL =
-  "/api";
-
 type TimeEntry = {
   id: string;
   type: "entrada" | "saida" | "pausa_inicio" | "pausa_fim";
@@ -74,30 +71,42 @@ export function TimeClockApp({
   const [workedTime, setWorkedTime] = useState(0);
   const [pauseTime, setPauseTime] = useState(0);
 
-  // Ajuste aqui depois quando tiver o ID real do funcionário logado
   const funcionarioId = userData.id;
-
-  const deliveriesToday = 12;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+  const deliveriesToday = 12;4
+  const [dataAtual, setDataAtual] = useState(new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (workStatus === "trabalhando") {
-        setWorkedTime((prev) => prev + 1);
-      } else if (workStatus === "pausa") {
-        setPauseTime((prev) => prev + 1);
-      }
-    }, 1000);
+  const timer = setInterval(() => {
+    const agora = new Date();
 
-    return () => clearInterval(interval);
-  }, [workStatus]);
+    setCurrentTime(agora);
+
+    // detecta virada de dia
+    if (
+      agora.getDate() !== dataAtual.getDate() ||
+      agora.getMonth() !== dataAtual.getMonth() ||
+      agora.getFullYear() !== dataAtual.getFullYear()
+    ) {
+      console.log("🔄 Virou o dia!");
+
+      setDataAtual(agora);
+
+      // recarrega registros do novo dia
+      carregarPontos();
+    }
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [dataAtual]);
+
+  useEffect(() => {
+  const resumo = recalcularResumoDoDia(timeEntries, currentTime);
+
+  setWorkedTime(resumo.workedSeconds);
+  setPauseTime(resumo.pauseSeconds);
+  setWorkStatus(resumo.statusAtual);
+}, [timeEntries, currentTime]);
+
 
   useEffect(() => {
     carregarPontos();
@@ -130,6 +139,89 @@ export function TimeClockApp({
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const isMesmoDia = (data: Date, referencia: Date) => {
+  return (
+    data.getDate() === referencia.getDate() &&
+    data.getMonth() === referencia.getMonth() &&
+    data.getFullYear() === referencia.getFullYear()
+  );
+};
+
+const recalcularResumoDoDia = (entries: TimeEntry[], agora: Date) => {
+  const registrosHoje = [...entries]
+    .filter((entry) => isMesmoDia(entry.timestamp, agora))
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  let segundosTrabalhados = 0;
+  let segundosPausa = 0;
+
+  let inicioTrabalho: Date | null = null;
+  let inicioPausa: Date | null = null;
+  let statusAtual: WorkStatus = "fora";
+
+  for (const entry of registrosHoje) {
+    if (entry.type === "entrada") {
+      inicioTrabalho = entry.timestamp;
+      inicioPausa = null;
+      statusAtual = "trabalhando";
+    }
+
+    if (entry.type === "pausa_inicio") {
+      if (inicioTrabalho) {
+        segundosTrabalhados += Math.floor(
+          (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000
+        );
+      }
+
+      inicioTrabalho = null;
+      inicioPausa = entry.timestamp;
+      statusAtual = "pausa";
+    }
+
+    if (entry.type === "pausa_fim") {
+      if (inicioPausa) {
+        segundosPausa += Math.floor(
+          (entry.timestamp.getTime() - inicioPausa.getTime()) / 1000
+        );
+      }
+
+      inicioPausa = null;
+      inicioTrabalho = entry.timestamp;
+      statusAtual = "trabalhando";
+    }
+
+    if (entry.type === "saida") {
+      if (inicioTrabalho) {
+        segundosTrabalhados += Math.floor(
+          (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000
+        );
+      }
+
+      inicioTrabalho = null;
+      inicioPausa = null;
+      statusAtual = "fora";
+    }
+  }
+
+  if (statusAtual === "trabalhando" && inicioTrabalho) {
+    segundosTrabalhados += Math.floor(
+      (agora.getTime() - inicioTrabalho.getTime()) / 1000
+    );
+  }
+
+  if (statusAtual === "pausa" && inicioPausa) {
+    segundosPausa += Math.floor(
+      (agora.getTime() - inicioPausa.getTime()) / 1000
+    );
+  }
+
+  return {
+    workedSeconds: Math.max(0, segundosTrabalhados),
+    pauseSeconds: Math.max(0, segundosPausa),
+    statusAtual,
+  };
+};
+
   const mapApiEntriesToUi = (entries: ApiTimeEntry[]): TimeEntry[] => {
   return entries.map((entry) => {
     let type: TimeEntry["type"] = "entrada";
@@ -147,109 +239,242 @@ export function TimeClockApp({
   });
 };
 
-  const carregarPontos = async () => {
-    try {
-      const response = await fetch(`/api/ponto/${funcionarioId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Erro ao buscar registros");
-      }
-
-      const registros = mapApiEntriesToUi(data);
-      setTimeEntries(registros);
-
-      if (registros.length > 0) {
-        const ultimo = registros[0];
-        if (ultimo.type === "entrada") {
-          setWorkStatus("trabalhando");
-        } else if (ultimo.type === "saida") {
-          setWorkStatus("fora");
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao carregar registros");
-    }
-  };
-
-  const registrarPonto = async (tipo: "ENTRADA" | "SAIDA") => {
-    const response = await fetch(`/api/ponto/registrar`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ funcionarioId, tipo }),
-    });
-
+const carregarPontos = async () => {
+  try {
+    const response = await fetch(`/api/ponto/${funcionarioId}`);
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || "Erro ao registrar ponto");
+      throw new Error(data.message || "Erro ao buscar registros");
     }
 
-    return data;
-  };
+    const registros = mapApiEntriesToUi(data);
+    setTimeEntries(registros);
 
-  const handleClockIn = async () => {
-    try {
-      await registrarPonto("ENTRADA");
-      await carregarPontos();
-      setWorkStatus("trabalhando");
+    const resumo = recalcularResumoDoDia(registros, new Date());
+    setWorkedTime(resumo.workedSeconds);
+    setPauseTime(resumo.pauseSeconds);
+    setWorkStatus(resumo.statusAtual);
+  } catch (error) {
+    console.error(error);
+    toast.error("Erro ao carregar registros");
+  }
+};
 
-      toast.success("Entrada registrada com sucesso!", {
-        description: formatTime(new Date()),
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível registrar a entrada");
-    }
-  };
+const obterLocalizacaoPrecisa = (): Promise<{
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+}> => {
+  if (!navigator.geolocation) {
+    return Promise.reject(
+      new Error("Geolocalização não suportada neste navegador")
+    );
+  }
 
-  const handleClockOut = async () => {
-    try {
-      await registrarPonto("SAIDA");
-      await carregarPontos();
-      setWorkStatus("fora");
+  return new Promise((resolve, reject) => {
+    const leituras: Array<{
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+    }> = [];
 
-      toast.success("Saída registrada com sucesso!", {
-        description: formatTime(new Date()),
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível registrar a saída");
-    }
-  };
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const leitura = {
+          latitude: Number(position.coords.latitude.toFixed(8)),
+          longitude: Number(position.coords.longitude.toFixed(8)),
+          accuracy: Number(position.coords.accuracy.toFixed(2)),
+        };
 
-  const handlePauseStart = () => {
-    const entry: TimeEntry = {
-      id: crypto.randomUUID(),
-      type: "pausa_inicio",
-      timestamp: new Date(),
-    };
+        console.log("Nova leitura:", leitura);
+        console.log(
+          "Mapa:",
+          `https://www.google.com/maps?q=${leitura.latitude},${leitura.longitude}`
+        );
 
-    setTimeEntries((prev) => [entry, ...prev]);
+        leituras.push(leitura);
+
+        if (leitura.accuracy <= 30) {
+          navigator.geolocation.clearWatch(watchId);
+          resolve(leitura);
+          return;
+        }
+
+        if (leituras.length >= 3) {
+          navigator.geolocation.clearWatch(watchId);
+
+          const melhor = [...leituras].sort(
+            (a, b) => a.accuracy - b.accuracy
+          )[0];
+
+          if (melhor.accuracy > 150) {
+            reject(
+              new Error(
+                `Localização imprecisa (${Math.round(
+                  melhor.accuracy
+                )}m). Tente no celular com GPS ligado.`
+              )
+            );
+            return;
+          }
+
+          resolve(melhor);
+        }
+      },
+      (error) => {
+        navigator.geolocation.clearWatch(watchId);
+
+        let mensagem = "Não foi possível obter a localização";
+
+        if (error.code === error.PERMISSION_DENIED) {
+          mensagem = "Permissão de localização negada";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          mensagem = "Localização indisponível no dispositivo";
+        } else if (error.code === error.TIMEOUT) {
+          mensagem = "Tempo esgotado ao obter localização";
+        }
+
+        reject(new Error(mensagem));
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 20000,
+      }
+    );
+
+    setTimeout(() => {
+      navigator.geolocation.clearWatch(watchId);
+
+      if (leituras.length === 0) {
+        reject(new Error("Nenhuma leitura de localização foi obtida"));
+        return;
+      }
+
+      const melhor = [...leituras].sort(
+        (a, b) => a.accuracy - b.accuracy
+      )[0];
+
+      if (melhor.accuracy > 150) {
+        reject(
+          new Error(
+            `Localização imprecisa (${Math.round(
+              melhor.accuracy
+            )}m). Tente no celular com GPS ligado.`
+          )
+        );
+        return;
+      }
+
+      resolve(melhor);
+    }, 12000);
+  });
+};
+
+const registrarPonto = async (
+  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO"
+) => {
+  const { latitude, longitude, accuracy } = await obterLocalizacaoPrecisa();
+
+  const response = await fetch(`/api/ponto/registrar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      funcionarioId,
+      tipo,
+      latitude,
+      longitude,
+      accuracy,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erro ao registrar ponto");
+  }
+
+  return data;
+};
+
+const handleClockIn = async () => {
+  try {
+    await registrarPonto("ENTRADA");
+    await carregarPontos();
+    setWorkStatus("trabalhando");
+
+    toast.success("Entrada registrada com sucesso!", {
+      description: formatTime(new Date()),
+    });
+  } catch (error) {
+    console.error(error);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Não foi possível registrar a entrada"
+    );
+  }
+};
+
+const handleClockOut = async () => {
+  try {
+    await registrarPonto("SAIDA");
+    await carregarPontos();
+    setWorkStatus("fora");
+
+    toast.success("Saída registrada com sucesso!", {
+      description: formatTime(new Date()),
+    });
+  } catch (error) {
+    console.error(error);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Não foi possível registrar a saída"
+    );
+  }
+};
+
+const handlePauseStart = async () => {
+  try {
+    await registrarPonto("SAIDA_ALMOCO");
+    await carregarPontos();
     setWorkStatus("pausa");
 
     toast.info("Pausa iniciada", {
-      description: formatTime(entry.timestamp),
+      description: formatTime(new Date()),
     });
-  };
+  } catch (error) {
+    console.error(error);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Não foi possível iniciar a pausa"
+    );
+  }
+};
 
-  const handlePauseEnd = () => {
-    const entry: TimeEntry = {
-      id: crypto.randomUUID(),
-      type: "pausa_fim",
-      timestamp: new Date(),
-    };
-
-    setTimeEntries((prev) => [entry, ...prev]);
+const handlePauseEnd = async () => {
+  try {
+    await registrarPonto("VOLTA_ALMOCO");
+    await carregarPontos();
     setWorkStatus("trabalhando");
 
     toast.info("Pausa finalizada", {
-      description: formatTime(entry.timestamp),
+      description: formatTime(new Date()),
     });
-  };
+  } catch (error) {
+    console.error(error);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Não foi possível finalizar a pausa"
+    );
+  }
+};
 
   const getStatusBadge = () => {
     switch (workStatus) {
