@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PontoModule } from './ponto/ponto.module';
 import { AuthModule } from './auth/auth.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     WhatsappModule,
     PontoModule,
     AuthModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

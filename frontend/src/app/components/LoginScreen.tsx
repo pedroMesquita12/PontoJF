@@ -15,6 +15,7 @@ type UserData = {
   email: string;
   cargo: string;
   perfil: string;
+  isAdmin: boolean;
 };
 
 type LoginScreenProps = {
@@ -22,6 +23,19 @@ type LoginScreenProps = {
 };
 
 const API_URL = "/api";
+
+function isAdminUser(perfil?: string, cargo?: string) {
+  const perfisAdmin = ["ADMIN", "SUPERADMIN", "GERENTE"];
+  const cargosAdmin = ["GERENTE", "SUPERVISOR", "COORDENADOR", "DIRETOR"];
+
+  const perfilNormalizado = (perfil || "").toUpperCase().trim();
+  const cargoNormalizado = (cargo || "").toUpperCase().trim();
+
+  return (
+    perfisAdmin.includes(perfilNormalizado) ||
+    cargosAdmin.includes(cargoNormalizado)
+  );
+}
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [matricula, setMatricula] = useState("");
@@ -40,15 +54,15 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       setIsLoading(true);
 
       const response = await fetch(`${API_URL}/auth/login`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    matricula,
-    senha,
-  }),
-});
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          matricula,
+          senha,
+        }),
+      });
 
       const data = await response.json();
 
@@ -56,14 +70,18 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         throw new Error(data.message || "Erro ao fazer login");
       }
 
+      const cargo = data.user.cargo ?? "Funcionário";
+      const perfil = data.user.perfil ?? "FUNCIONARIO";
+
       const user: UserData = {
         id: data.user.id,
         usuarioId: data.user.usuarioId,
         matricula: data.user.matricula,
         nome: data.user.nome,
         email: data.user.email,
-        cargo: data.user.cargo ?? "Funcionário",
-        perfil: data.user.perfil,
+        cargo,
+        perfil,
+        isAdmin: isAdminUser(perfil, cargo),
       };
 
       localStorage.setItem("user", JSON.stringify(user));
