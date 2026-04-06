@@ -1,357 +1,761 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Package,
-  TrendingUp,
-  Calendar,
-  MapPin,
-  CheckCircle2,
-  Clock,
   Search,
+  MapPin,
   Download,
   Filter,
+  Upload,
+  FileSpreadsheet,
+  Loader2,
+  Trash2,
 } from "lucide-react";
-import { motion } from "motion/react";
 
-type UserData = {
-  matricula: string;
-  nome: string;
-  cargo: string;
-};
+type EntregaStatus = "ENTREGUE" | "EM_ROTA" | "PENDENTE" | "CANCELADO" | null;
 
-type DeliveryReportsProps = {
-  userData: UserData;
-};
-
-type Delivery = {
+type Entrega = {
   id: string;
-  codigo: string;
-  destinatario: string;
-  endereco: string;
-  status: "entregue" | "pendente" | "em_rota";
-  horario: string;
-  data: string;
+  codigo: string | null;
+  endereco: string | null;
+  cidade: string | null;
+  dataEntrega: string | null;
+  status: EntregaStatus;
+  valorEntrega: string | number | null;
+  entregadorNome?: string | null;
+  entregadorTelefone?: string | null;
+  origemArquivo?: string | null;
 };
 
-export function DeliveryReports({ userData }: DeliveryReportsProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("todos");
-
-  // Mock data
-  const deliveries: Delivery[] = [
-    {
-      id: "1",
-      codigo: "#ENT-1234",
-      destinatario: "Maria Silva",
-      endereco: "Rua das Flores, 123 - Centro",
-      status: "entregue",
-      horario: "14:32",
-      data: "2024-03-23",
-    },
-    {
-      id: "2",
-      codigo: "#ENT-1235",
-      destinatario: "João Santos",
-      endereco: "Av. Principal, 456 - Jardim",
-      status: "entregue",
-      horario: "13:15",
-      data: "2024-03-23",
-    },
-    {
-      id: "3",
-      codigo: "#ENT-1236",
-      destinatario: "Ana Costa",
-      endereco: "Rua do Comércio, 789 - Vila Nova",
-      status: "entregue",
-      horario: "11:45",
-      data: "2024-03-23",
-    },
-    {
-      id: "4",
-      codigo: "#ENT-1237",
-      destinatario: "Pedro Oliveira",
-      endereco: "Travessa das Palmeiras, 321 - Bairro Alto",
-      status: "em_rota",
-      horario: "15:00",
-      data: "2024-03-23",
-    },
-    {
-      id: "5",
-      codigo: "#ENT-1238",
-      destinatario: "Carla Mendes",
-      endereco: "Rua da Esperança, 555 - Centro",
-      status: "pendente",
-      horario: "-",
-      data: "2024-03-23",
-    },
-  ];
-
-  const stats = {
-    total: deliveries.length,
-    entregues: deliveries.filter((d) => d.status === "entregue").length,
-    pendentes: deliveries.filter((d) => d.status === "pendente").length,
-    emRota: deliveries.filter((d) => d.status === "em_rota").length,
+type DadosRelatorio = {
+  stats: {
+    totalEntregas: number;
+    entregues: number;
+    emRota: number;
+    pendentes: number;
+    canceladas?: number;
   };
+  entregas: Entrega[];
+};
 
-  const getStatusBadge = (status: Delivery["status"]) => {
-    switch (status) {
-      case "entregue":
-        return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-            <CheckCircle2 className="size-3 mr-1" />
-            Entregue
-          </Badge>
-        );
-      case "em_rota":
-        return (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-            <Clock className="size-3 mr-1" />
-            Em Rota
-          </Badge>
-        );
-      case "pendente":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-            <Package className="size-3 mr-1" />
-            Pendente
-          </Badge>
-        );
+export default function DeliveryReports() {
+  const [dados, setDados] = useState<DadosRelatorio | null>(null);
+  const [cidades, setCidades] = useState<string[]>([]);
+  const [busca, setBusca] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [status, setStatus] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const [arquivosSelecionados, setArquivosSelecionados] = useState<string[]>([]);
+  const [entregasSelecionadas, setEntregasSelecionadas] = useState<string[]>([]);
+
+  const userData = localStorage.getItem("user");
+  const usuario = userData ? JSON.parse(userData) : null;
+  const usuarioId = usuario?.id || usuario?.usuarioId || 1;
+
+  const entregas = useMemo(() => dados?.entregas ?? [], [dados]);
+
+  const arquivosUnicos = useMemo(() => {
+    const set = new Set<string>();
+
+    entregas.forEach((e) => {
+      if (e.origemArquivo) {
+        set.add(e.origemArquivo);
+      }
+    });
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [entregas]);
+
+  async function carregarCidades() {
+    try {
+      const response = await fetch("/api/admin/relatorios/entregas/cidades");
+
+      if (!response.ok) {
+        throw new Error("Erro ao carregar cidades.");
+      }
+
+      const data = await response.json();
+      setCidades(data);
+    } catch (err) {
+      console.error(err);
     }
-  };
+  }
 
-  const filteredDeliveries = deliveries.filter((delivery) => {
-    const matchesSearch =
-      delivery.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.destinatario.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.endereco.toLowerCase().includes(searchTerm.toLowerCase());
+  async function carregarEntregas() {
+    try {
+      setLoading(true);
+      setErro("");
 
-    const matchesFilter =
-      filterStatus === "todos" || delivery.status === filterStatus;
+      const params = new URLSearchParams();
 
-    return matchesSearch && matchesFilter;
-  });
+      if (cidade) params.append("cidade", cidade);
+      if (status) params.append("status", status);
+      if (dataInicio) params.append("dataInicio", dataInicio);
+      if (dataFim) params.append("dataFim", dataFim);
+      if (busca) params.append("busca", busca);
+
+      const response = await fetch(
+        `/api/admin/relatorios/entregas?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Erro ao carregar os relatórios.");
+      }
+
+      const data = await response.json();
+      setDados(data);
+    } catch (err) {
+      console.error(err);
+      setErro("Não foi possível carregar os relatórios.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    carregarCidades();
+  }, []);
+
+  useEffect(() => {
+    carregarEntregas();
+  }, [cidade, status, dataInicio, dataFim, busca]);
+
+  useEffect(() => {
+    setArquivosSelecionados((prev) =>
+      prev.filter((nome) => arquivosUnicos.includes(nome))
+    );
+  }, [arquivosUnicos]);
+
+  useEffect(() => {
+    setEntregasSelecionadas((prev) =>
+      prev.filter((id) => entregas.some((entrega) => entrega.id === id))
+    );
+  }, [entregas]);
+
+  async function importarArquivo() {
+    if (!arquivo) {
+      setErro("Selecione um arquivo .xlsx ou .csv antes de importar.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setErro("");
+      setMensagem("");
+
+      const formData = new FormData();
+      formData.append("file", arquivo);
+
+      const response = await fetch(
+        `/api/admin/relatorios/importar/entregas?usuarioId=${usuarioId}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Erro ao importar planilha.");
+      }
+
+      setMensagem(
+        `Planilha importada com sucesso. ${data.totalImportado ?? 0} registros adicionados.`
+      );
+
+      setArquivo(null);
+
+      const input = document.getElementById(
+        "input-planilha"
+      ) as HTMLInputElement | null;
+
+      if (input) input.value = "";
+
+      await carregarCidades();
+      await carregarEntregas();
+    } catch (err: any) {
+      console.error(err);
+      setErro(err?.message || "Erro ao importar planilha.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function limparFiltros() {
+    setBusca("");
+    setCidade("");
+    setStatus("");
+    setDataInicio("");
+    setDataFim("");
+  }
+
+  function toggleArquivo(nome: string) {
+    setArquivosSelecionados((prev) =>
+      prev.includes(nome)
+        ? prev.filter((item) => item !== nome)
+        : [...prev, nome]
+    );
+  }
+
+  function toggleEntrega(id: string) {
+    setEntregasSelecionadas((prev) =>
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
+    );
+  }
+
+  function selecionarTodasPlanilhas() {
+    setArquivosSelecionados(arquivosUnicos);
+  }
+
+  function limparSelecaoPlanilhas() {
+    setArquivosSelecionados([]);
+  }
+
+  function selecionarTodasEntregas() {
+    setEntregasSelecionadas(entregas.map((entrega) => entrega.id));
+  }
+
+  function limparSelecaoEntregas() {
+    setEntregasSelecionadas([]);
+  }
+
+  async function handleApagar() {
+    const totalEntregas = entregasSelecionadas.length;
+    const totalArquivos = arquivosSelecionados.length;
+
+    if (totalEntregas === 0 && totalArquivos === 0) {
+      const confirmarTudo = window.confirm(
+        "Nenhum item foi selecionado. Deseja apagar TODOS os dados importados?"
+      );
+
+      if (!confirmarTudo) return;
+
+      try {
+        setDeleting(true);
+        setErro("");
+        setMensagem("");
+
+        const response = await fetch("/api/admin/relatorios/entregas", {
+          method: "DELETE",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.message || "Erro ao apagar tudo.");
+        }
+
+        setMensagem(data?.message || "Todos os dados foram removidos com sucesso.");
+        setArquivosSelecionados([]);
+        setEntregasSelecionadas([]);
+
+        await carregarCidades();
+        await carregarEntregas();
+      } catch (err: any) {
+        console.error(err);
+        setErro(err?.message || "Erro ao apagar tudo.");
+      } finally {
+        setDeleting(false);
+      }
+
+      return;
+    }
+
+    let texto = "Deseja apagar os itens selecionados?\n\n";
+
+    if (totalEntregas > 0) {
+      texto += `• ${totalEntregas} dado(s) específico(s)\n`;
+    }
+
+    if (totalArquivos > 0) {
+      texto += `• ${totalArquivos} planilha(s) selecionada(s)\n`;
+    }
+
+    const confirmar = window.confirm(texto);
+    if (!confirmar) return;
+
+    try {
+      setDeleting(true);
+      setErro("");
+      setMensagem("");
+
+      if (totalEntregas > 0) {
+        const responseEntregas = await fetch(
+          "/api/admin/relatorios/entregas/selecionadas",
+          {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ids: entregasSelecionadas,
+            }),
+          }
+        );
+
+        const dataEntregas = await responseEntregas.json();
+
+        if (!responseEntregas.ok) {
+          throw new Error(
+            dataEntregas?.message || "Erro ao apagar dados selecionados."
+          );
+        }
+      }
+
+      if (totalArquivos > 0) {
+        const responseArquivos = await fetch(
+          "/api/admin/relatorios/entregas/arquivos",
+          {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              arquivos: arquivosSelecionados,
+            }),
+          }
+        );
+
+        const dataArquivos = await responseArquivos.json();
+
+        if (!responseArquivos.ok) {
+          throw new Error(
+            dataArquivos?.message || "Erro ao apagar planilhas selecionadas."
+          );
+        }
+      }
+
+      setMensagem("Itens selecionados removidos com sucesso.");
+      setArquivosSelecionados([]);
+      setEntregasSelecionadas([]);
+
+      await carregarCidades();
+      await carregarEntregas();
+    } catch (err: any) {
+      console.error(err);
+      setErro(err?.message || "Erro ao apagar itens.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function formatarStatus(status: EntregaStatus) {
+    switch (status) {
+      case "ENTREGUE":
+        return "Entregue";
+      case "EM_ROTA":
+        return "Em Rota";
+      case "PENDENTE":
+        return "Pendente";
+      case "CANCELADO":
+        return "Cancelado";
+      default:
+        return "Sem status";
+    }
+  }
+
+  function getStatusClasses(status: EntregaStatus) {
+    switch (status) {
+      case "ENTREGUE":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "EM_ROTA":
+        return "bg-blue-100 text-blue-700 border-blue-200";
+      case "PENDENTE":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "CANCELADO":
+        return "bg-red-100 text-red-700 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  }
+
+  function formatarData(data?: string | null) {
+    if (!data) return "-";
+
+    const date = new Date(data);
+    if (Number.isNaN(date.getTime())) return "-";
+
+    return date.toLocaleDateString("pt-BR");
+  }
+
+  function formatarHorario(data?: string | null) {
+    if (!data) return "-";
+
+    const date = new Date(data);
+    if (Number.isNaN(date.getTime())) return "-";
+
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function formatarValor(valor?: string | number | null) {
+    if (valor === null || valor === undefined || valor === "") return "-";
+
+    const numero = typeof valor === "number" ? valor : Number(valor);
+
+    if (Number.isNaN(numero)) return String(valor);
+
+    return numero.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Relatórios de Entregas</h2>
-            <p className="text-slate-600 mt-1">Acompanhe suas entregas realizadas</p>
-          </div>
-          <Button className="gap-2">
-            <Download className="size-4" />
-            Exportar Relatório
-          </Button>
+      <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <h1 className="text-4xl font-bold text-[#15182e]">
+            Relatórios de Entregas
+          </h1>
+          <p className="mt-1 text-[#646680]">
+            Importe planilhas da empresa e filtre as entregas por cidade, status,
+            data e busca textual.
+          </p>
         </div>
-      </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Total de Entregas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
-              <p className="text-xs text-slate-600 mt-1">Hoje</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="flex flex-wrap gap-3">
+          <label
+            htmlFor="input-planilha"
+            className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50"
+          >
+            <FileSpreadsheet size={16} />
+            {arquivo ? arquivo.name : "Selecionar planilha"}
+          </label>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Entregues
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.entregues}</div>
-              <p className="text-xs text-slate-600 mt-1">
-                {Math.round((stats.entregues / stats.total) * 100)}% do total
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          <input
+            id="input-planilha"
+            type="file"
+            accept=".xlsx,.csv"
+            className="hidden"
+            onChange={(e) => setArquivo(e.target.files?.[0] || null)}
+          />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Em Rota
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.emRota}</div>
-              <p className="text-xs text-slate-600 mt-1">Em andamento</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          <button
+            onClick={importarArquivo}
+            disabled={uploading}
+            className="flex items-center gap-2 rounded-xl bg-[#15182e] px-4 py-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {uploading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Upload size={16} />
+            )}
+            {uploading ? "Importando..." : "Importar planilha"}
+          </button>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Pendentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.pendentes}</div>
-              <p className="text-xs text-slate-600 mt-1">Aguardando</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50">
+            <Download size={16} />
+            Exportar Relatório
+          </button>
+
+          <button
+            onClick={handleApagar}
+            disabled={deleting || uploading}
+            className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deleting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Trash2 size={16} />
+            )}
+            {deleting ? "Apagando..." : "Apagar"}
+          </button>
+        </div>
       </div>
 
-      {/* Filters and Search */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.5 }}
-      >
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Label htmlFor="search" className="sr-only">
-                  Buscar
-                </Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                  <Input
-                    id="search"
-                    placeholder="Buscar por código, destinatário ou endereço..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-[#15182e]">
+            Planilhas importadas
+          </h2>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={selecionarTodasPlanilhas}
+              disabled={arquivosUnicos.length === 0}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Selecionar todas
+            </button>
+
+            <button
+              onClick={limparSelecaoPlanilhas}
+              disabled={arquivosSelecionados.length === 0}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Limpar seleção
+            </button>
+          </div>
+        </div>
+
+        {arquivosUnicos.length === 0 ? (
+          <p className="text-sm text-[#646680]">
+            Nenhuma planilha importada encontrada.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {arquivosUnicos.map((nomeArquivo) => (
+              <label
+                key={nomeArquivo}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 hover:bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={arquivosSelecionados.includes(nomeArquivo)}
+                  onChange={() => toggleArquivo(nomeArquivo)}
+                />
+                <span className="text-sm text-[#15182e]">{nomeArquivo}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {mensagem && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {mensagem}
+        </div>
+      )}
+
+      {erro && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {erro}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Total de Entregas</p>
+          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+            {dados?.stats.totalEntregas ?? 0}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Resultado filtrado</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Entregues</p>
+          <h3 className="mt-4 text-4xl font-bold text-green-600">
+            {dados?.stats.entregues ?? 0}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Concluídas</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Em Rota</p>
+          <h3 className="mt-4 text-4xl font-bold text-blue-600">
+            {dados?.stats.emRota ?? 0}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Em andamento</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Pendentes</p>
+          <h3 className="mt-4 text-4xl font-bold text-yellow-500">
+            {dados?.stats.pendentes ?? 0}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Aguardando</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
+          <div className="xl:col-span-2">
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-3">
+              <Search size={18} className="text-[#8c8da9]" />
+              <input
+                type="text"
+                placeholder="Buscar por código, endereço, cidade ou entregador..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="w-full bg-transparent text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <select
+            value={cidade}
+            onChange={(e) => setCidade(e.target.value)}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+          >
+            <option value="">Todas as cidades</option>
+            {cidades.map((cidadeItem) => (
+              <option key={cidadeItem} value={cidadeItem}>
+                {cidadeItem}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+          >
+            <option value="">Todos os status</option>
+            <option value="ENTREGUE">Entregue</option>
+            <option value="EM_ROTA">Em Rota</option>
+            <option value="PENDENTE">Pendente</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+          />
+
+          <input
+            type="date"
+            value={dataFim}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+          />
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={limparFiltros}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-[#15182e] hover:bg-gray-50"
+          >
+            <Filter size={15} />
+            Limpar filtros
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold text-[#15182e]">
+              Entregas Recentes
+            </h2>
+            <p className="text-[#646680]">
+              Lista de entregas encontradas ({entregas.length} resultados)
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={selecionarTodasEntregas}
+              disabled={entregas.length === 0}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Selecionar todas
+            </button>
+
+            <button
+              onClick={limparSelecaoEntregas}
+              disabled={entregasSelecionadas.length === 0}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Limpar seleção
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-[#646680]">
+            <Loader2 size={18} className="animate-spin" />
+            Carregando...
+          </div>
+        ) : entregas.length === 0 ? (
+          <div className="py-10 text-center text-[#646680]">
+            Nenhuma entrega encontrada com os filtros selecionados.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {entregas.map((entrega) => (
+              <div
+                key={entrega.id}
+                className="flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 p-4 lg:flex-row lg:items-center"
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={entregasSelecionadas.includes(entrega.id)}
+                    onChange={() => toggleEntrega(entrega.id)}
+                    className="mt-1"
                   />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={filterStatus === "todos" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("todos")}
-                  size="sm"
-                >
-                  Todos
-                </Button>
-                <Button
-                  variant={filterStatus === "entregue" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("entregue")}
-                  size="sm"
-                >
-                  Entregues
-                </Button>
-                <Button
-                  variant={filterStatus === "em_rota" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("em_rota")}
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                >
-                  Em Rota
-                </Button>
-                <Button
-                  variant={filterStatus === "pendente" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("pendente")}
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                >
-                  Pendentes
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
 
-      {/* Deliveries List */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.6 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Entregas Recentes</CardTitle>
-            <CardDescription>
-              Lista de todas as entregas do dia ({filteredDeliveries.length}{" "}
-              {filteredDeliveries.length === 1 ? "resultado" : "resultados"})
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {filteredDeliveries.map((delivery, index) => (
-                <motion.div
-                  key={delivery.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.7 + index * 0.05 }}
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all"
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-semibold text-slate-900">
-                        {delivery.codigo}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <strong className="text-lg text-[#15182e]">
+                        {entrega.codigo || "Sem código"}
+                      </strong>
+
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                          entrega.status
+                        )}`}
+                      >
+                        {formatarStatus(entrega.status)}
                       </span>
-                      {getStatusBadge(delivery.status)}
                     </div>
-                    <p className="font-medium text-slate-900">{delivery.destinatario}</p>
-                    <div className="flex items-start gap-2 text-sm text-slate-600">
-                      <MapPin className="size-4 mt-0.5 flex-shrink-0" />
-                      <span>{delivery.endereco}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="text-right">
-                      <p className="text-slate-600">Horário</p>
-                      <p className="font-medium text-slate-900">{delivery.horario}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
 
-              {filteredDeliveries.length === 0 && (
-                <div className="text-center py-12">
-                  <Package className="size-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-600">Nenhuma entrega encontrada</p>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Tente ajustar os filtros ou busca
-                  </p>
+                    <div className="flex items-center gap-2 text-sm text-[#646680]">
+                      <MapPin size={15} />
+                      <span>
+                        {[entrega.endereco, entrega.cidade]
+                          .filter(Boolean)
+                          .join(" - ")}
+                      </span>
+                    </div>
+
+                    <div className="text-sm text-[#646680]">
+                      Entregador: {entrega.entregadorNome || "-"}
+                      {entrega.entregadorTelefone
+                        ? ` • ${entrega.entregadorTelefone}`
+                        : ""}
+                    </div>
+
+                    {entrega.origemArquivo && (
+                      <div className="text-xs text-[#8c8da9]">
+                        Arquivo: {entrega.origemArquivo}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+
+                <div className="grid min-w-[220px] grid-cols-2 gap-4 text-sm lg:text-right">
+                  <div>
+                    <p className="text-[#8c8da9]">Data</p>
+                    <p className="font-semibold text-[#15182e]">
+                      {formatarData(entrega.dataEntrega)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[#8c8da9]">Horário</p>
+                    <p className="font-semibold text-[#15182e]">
+                      {formatarHorario(entrega.dataEntrega)}
+                    </p>
+                  </div>
+
+                  <div className="col-span-2">
+                    <p className="text-[#8c8da9]">Valor</p>
+                    <p className="font-semibold text-[#15182e]">
+                      {formatarValor(entrega.valorEntrega)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

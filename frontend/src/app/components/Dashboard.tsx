@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { TimeClockApp } from "./TimeClockApp";
-import { DeliveryReports } from "./DeliveryReports";
+import DeliveryReports from "./DeliveryReports";
 import { PackageEntry } from "./PackageEntry";
 import { DashboardOverview } from "./DashboardOverview";
 
@@ -108,7 +108,7 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
           </TabsContent>
 
           <TabsContent value="reports">
-            <DeliveryReports userData={userData} />
+            <DeliveryReports />
           </TabsContent>
 
           <TabsContent value="packages">

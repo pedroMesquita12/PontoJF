@@ -151,6 +151,73 @@ model registros_ponto {
   @@index([funcionario_id, data_referencia], map: "idx_registros_ponto_funcionario_data")
 }
 
+model importacoes_relatorios {
+  id                    BigInt                @id @default(autoincrement())
+  nome_arquivo          String                @db.VarChar(255)
+  tipo_relatorio        tipo_relatorio
+  data_importacao       DateTime              @default(now()) @db.Timestamp(6)
+  importado_por         BigInt?
+  observacoes           String?
+  created_at            DateTime              @default(now()) @db.Timestamp(6)
+  updated_at            DateTime              @default(now()) @db.Timestamp(6)
+
+  usuarios              usuarios?             @relation(fields: [importado_por], references: [id], onUpdate: NoAction, map: "fk_importacao_usuario")
+  relatorios_entregas   relatorios_entregas[]
+  relatorios_orcamentos relatorios_orcamentos[]
+
+  @@index([tipo_relatorio], map: "idx_importacoes_tipo_relatorio")
+  @@index([data_importacao], map: "idx_importacoes_data_importacao")
+  @@index([importado_por], map: "idx_importacoes_importado_por")
+}
+
+model relatorios_entregas {
+  id                     BigInt                   @id @default(autoincrement())
+  importacao_id          BigInt
+  codigo_entrega         String?                  @db.VarChar(50)
+  endereco               String?                  @db.VarChar(255)
+  cidade                 String?                  @db.VarChar(100)
+  data_entrega           DateTime?                @db.Timestamp(6)
+  status                 status_entrega_relatorio?
+  valor_entrega          Decimal?                 @db.Decimal(10, 2)
+  entregador_nome        String?                  @db.VarChar(150)
+  entregador_telefone    String?                  @db.VarChar(20)
+  origem_arquivo         String?                  @db.VarChar(255)
+  created_at             DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamp(6)
+
+  importacoes_relatorios importacoes_relatorios   @relation(fields: [importacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_relatorio_entrega_importacao")
+
+  @@index([cidade], map: "idx_relatorios_entregas_cidade")
+  @@index([status], map: "idx_relatorios_entregas_status")
+  @@index([data_entrega], map: "idx_relatorios_entregas_data_entrega")
+  @@index([importacao_id], map: "idx_relatorios_entregas_importacao")
+  @@index([codigo_entrega], map: "idx_relatorios_entregas_codigo")
+}
+
+model relatorios_orcamentos {
+  id                    BigInt                  @id @default(autoincrement())
+  importacao_id         BigInt
+  codigo_orcamento      String?                 @db.VarChar(50)
+  cliente               String?                 @db.VarChar(150)
+  cidade                String?                 @db.VarChar(100)
+  estado                String?                 @db.VarChar(2)
+  data_orcamento        DateTime?               @db.Date
+  status                status_orcamento_relatorio?
+  valor                 Decimal?                @db.Decimal(10, 2)
+  observacoes           String?
+  origem_arquivo        String?                 @db.VarChar(255)
+  created_at            DateTime                @default(now()) @db.Timestamp(6)
+  updated_at            DateTime                @default(now()) @db.Timestamp(6)
+
+  importacoes_relatorios importacoes_relatorios @relation(fields: [importacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_relatorio_orcamento_importacao")
+
+  @@index([cidade], map: "idx_relatorios_orcamentos_cidade")
+  @@index([status], map: "idx_relatorios_orcamentos_status")
+  @@index([data_orcamento], map: "idx_relatorios_orcamentos_data_orcamento")
+  @@index([importacao_id], map: "idx_relatorios_orcamentos_importacao")
+  @@index([codigo_orcamento], map: "idx_relatorios_orcamentos_codigo")
+}
+
 model setores {
   id           BigInt         @id @default(autoincrement())
   nome         String         @unique @db.VarChar(100)
@@ -161,19 +228,20 @@ model setores {
 }
 
 model usuarios {
-  id                   BigInt                 @id @default(autoincrement())
-  nome                 String                 @db.VarChar(150)
-  email                String                 @unique @db.VarChar(150)
-  senha_hash           String
-  perfil               tipo_perfil            @default(FUNCIONARIO)
-  ultimo_login         DateTime?              @db.Timestamp(6)
-  ativo                Boolean                @default(true)
-  created_at           DateTime               @default(now()) @db.Timestamp(6)
-  updated_at           DateTime               @default(now()) @db.Timestamp(6)
-  ajustes_ponto        ajustes_ponto[]
-  auditoria            auditoria[]
-  funcionarios         funcionarios?
-  justificativas_ponto justificativas_ponto[]
+  id                     BigInt                 @id @default(autoincrement())
+  nome                   String                 @db.VarChar(150)
+  email                  String                 @unique @db.VarChar(150)
+  senha_hash             String
+  perfil                 tipo_perfil            @default(FUNCIONARIO)
+  ultimo_login           DateTime?              @db.Timestamp(6)
+  ativo                  Boolean                @default(true)
+  created_at             DateTime               @default(now()) @db.Timestamp(6)
+  updated_at             DateTime               @default(now()) @db.Timestamp(6)
+  ajustes_ponto          ajustes_ponto[]
+  auditoria              auditoria[]
+  funcionarios           funcionarios?
+  justificativas_ponto   justificativas_ponto[]
+  importacoes_relatorios importacoes_relatorios[]
 
   @@index([email], map: "idx_usuarios_email")
 }
@@ -182,6 +250,25 @@ enum status_ajuste {
   PENDENTE
   APROVADO
   REJEITADO
+}
+
+enum tipo_relatorio {
+  ENTREGAS
+  ORCAMENTOS
+}
+
+enum status_entrega_relatorio {
+  ENTREGUE
+  EM_ROTA
+  PENDENTE
+  CANCELADO
+}
+
+enum status_orcamento_relatorio {
+  ABERTO
+  APROVADO
+  REJEITADO
+  FINALIZADO
 }
 
 enum status_funcionario {
