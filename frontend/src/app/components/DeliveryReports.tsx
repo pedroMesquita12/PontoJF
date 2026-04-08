@@ -33,9 +33,17 @@ type DadosRelatorio = {
     pendentes: number;
     canceladas?: number;
   };
+
+  financeiro?: {
+    valorTotal: number;
+    ticketMedio: number;
+    maiorEntrega: number;
+    menorEntrega: number;
+    totalComValor: number;
+  };
+
   entregas: Entrega[];
 };
-
 export default function DeliveryReports() {
   const [dados, setDados] = useState<DadosRelatorio | null>(null);
   const [cidades, setCidades] = useState<string[]>([]);
@@ -363,6 +371,61 @@ export default function DeliveryReports() {
         return "Sem status";
     }
   }
+  async function exportarEntregas() {
+  try {
+    setErro("");
+    setMensagem("");
+
+    const body =
+      entregasSelecionadas.length > 0
+        ? { ids: entregasSelecionadas }
+        : {
+            cidade,
+            status,
+            dataInicio,
+            dataFim,
+            busca,
+          };
+
+    const response = await fetch("/api/admin/relatorios/entregas/exportar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const erroData = await response.json();
+      throw new Error(erroData?.message || "Erro ao exportar relatório.");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download =
+      entregasSelecionadas.length > 0
+        ? "entregas-selecionadas.xlsx"
+        : "relatorio-entregas.xlsx";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    setMensagem(
+      entregasSelecionadas.length > 0
+        ? "Registros selecionados exportados com sucesso."
+        : "Relatório exportado com sucesso."
+    );
+  } catch (err: any) {
+    console.error(err);
+    setErro(err?.message || "Não foi possível exportar os dados.");
+  }
+}
 
   function getStatusClasses(status: EntregaStatus) {
     switch (status) {
@@ -389,16 +452,29 @@ export default function DeliveryReports() {
   }
 
   function formatarHorario(data?: string | null) {
-    if (!data) return "-";
+  if (!data) return "-";
 
-    const date = new Date(data);
-    if (Number.isNaN(date.getTime())) return "-";
+  const date = new Date(data);
+  if (Number.isNaN(date.getTime())) return "-";
 
-    return date.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const iso = typeof data === "string" ? data : "";
+
+  const ehDataSemHoraReal =
+    iso.includes("T00:00:00") ||
+    iso.includes("T00:00:00.000Z") ||
+    (date.getUTCHours() === 0 &&
+      date.getUTCMinutes() === 0 &&
+      date.getUTCSeconds() === 0);
+
+  if (ehDataSemHoraReal) {
+    return "-";
   }
+
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
   function formatarValor(valor?: string | number | null) {
     if (valor === null || valor === undefined || valor === "") return "-";
@@ -456,10 +532,15 @@ export default function DeliveryReports() {
             {uploading ? "Importando..." : "Importar planilha"}
           </button>
 
-          <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50">
-            <Download size={16} />
-            Exportar Relatório
-          </button>
+          <button
+  onClick={exportarEntregas}
+  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50"
+>
+  <Download size={16} />
+  {entregasSelecionadas.length > 0
+    ? `Exportar selecionados (${entregasSelecionadas.length})`
+    : "Exportar Relatório"}
+</button>
 
           <button
             onClick={handleApagar}
@@ -535,7 +616,39 @@ export default function DeliveryReports() {
           {erro}
         </div>
       )}
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <p className="text-sm text-[#646680]">Valor Total</p>
+    <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+      {formatarValor(dados?.financeiro?.valorTotal ?? 0)}
+    </h3>
+    <p className="mt-2 text-sm text-[#8c8da9]">Faturamento total</p>
+  </div>
 
+  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <p className="text-sm text-[#646680]">Ticket Médio</p>
+    <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+      {formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
+    </h3>
+    <p className="mt-2 text-sm text-[#8c8da9]">Média por entrega</p>
+  </div>
+
+  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <p className="text-sm text-[#646680]">Maior Entrega</p>
+    <h3 className="mt-4 text-4xl font-bold text-green-600">
+      {formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
+    </h3>
+    <p className="mt-2 text-sm text-[#8c8da9]">Maior valor</p>
+  </div>
+
+  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <p className="text-sm text-[#646680]">Menor Entrega</p>
+    <h3 className="mt-4 text-4xl font-bold text-blue-600">
+      {formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
+    </h3>
+    <p className="mt-2 text-sm text-[#8c8da9]">Menor valor</p>
+  </div>
+</div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-[#646680]">Total de Entregas</p>

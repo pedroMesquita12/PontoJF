@@ -148,28 +148,51 @@ export class RelatoriosService {
     const emRota = entregas.filter((e) => e.status === 'EM_ROTA').length;
     const pendentes = entregas.filter((e) => e.status === 'PENDENTE').length;
     const canceladas = entregas.filter((e) => e.status === 'CANCELADO').length;
+    
+    // ===== FINANCEIRO =====
+const valores = entregas
+  .map((e) => {
+    if (e.valor_entrega === null || e.valor_entrega === undefined) return null;
+    return Number(e.valor_entrega);
+  })
+  .filter((v): v is number => v !== null && !Number.isNaN(v));
+
+const valorTotal = valores.reduce((acc, v) => acc + v, 0);
+const totalComValor = valores.length;
+const ticketMedio = totalComValor > 0 ? valorTotal / totalComValor : 0;
+const maiorEntrega = totalComValor > 0 ? Math.max(...valores) : 0;
+const menorEntrega = totalComValor > 0 ? Math.min(...valores) : 0;
 
     return {
-      stats: {
-        totalEntregas,
-        entregues,
-        emRota,
-        pendentes,
-        canceladas,
-      },
-      entregas: entregas.map((item) => ({
-        id: item.id.toString(),
-        codigo: item.codigo_entrega,
-        endereco: item.endereco,
-        cidade: item.cidade,
-        dataEntrega: item.data_entrega,
-        status: item.status,
-        valorEntrega: item.valor_entrega,
-        entregadorNome: item.entregador_nome,
-        entregadorTelefone: item.entregador_telefone,
-        origemArquivo: item.origem_arquivo,
-      })),
-    };
+  stats: {
+    totalEntregas,
+    entregues,
+    emRota,
+    pendentes,
+    canceladas,
+  },
+
+  financeiro: {
+    valorTotal,
+    ticketMedio,
+    maiorEntrega,
+    menorEntrega,
+    totalComValor,
+  },
+
+  entregas: entregas.map((item) => ({
+    id: item.id.toString(),
+    codigo: item.codigo_entrega,
+    endereco: item.endereco,
+    cidade: item.cidade,
+    dataEntrega: item.data_entrega,
+    status: item.status,
+    valorEntrega: item.valor_entrega,
+    entregadorNome: item.entregador_nome,
+    entregadorTelefone: item.entregador_telefone,
+    origemArquivo: item.origem_arquivo,
+  })),
+};
   }
   
   async listarCidadesEntregas() {
@@ -345,18 +368,31 @@ export class RelatoriosService {
         'código',
       ]) ?? null;
 
-    const statusRaw = this.getValue(row, ['status']) ?? null;
+    const statusRaw =
+  this.getValue(row, [
+    'status',
+    'status da entrega',
+    'situacao',
+    'situação',
+    'situacao da entrega',
+    'situação da entrega',
+    'status pedido',
+    'ocorrencia',
+    'ocorrência',
+  ]) ?? null;
 
     const dataEntregaRaw =
-      this.getValue(row, [
-        'momento que o entregador registrou o encerramento',
-        'momento do aceite',
-        'momento da solicitacao',
-        'momento da solicitação',
-        'data da entrega',
-        'data entrega',
-        'data',
-      ]) ?? null;
+  this.getValue(row, [
+    'momento que o entregador registrou o encerramento',
+    'momento do aceite',
+    'momento da solicitacao',
+    'momento da solicitação',
+    'data da entrega',
+    'data entrega',
+    'data',
+  ]) ?? null;
+
+console.log('DATA RAW:', dataEntregaRaw);
 
     const endereco =
       this.getValue(row, [
@@ -420,19 +456,29 @@ export class RelatoriosService {
     };
   }
 
-  private getValue(row: Record<string, any>, keys: string[]) {
-    for (const key of keys) {
-      if (
-        row[key] !== undefined &&
-        row[key] !== null &&
-        String(row[key]).trim() !== ''
-      ) {
-        return this.corrigirValor(row[key]);
-      }
-    }
+  private getValue(row: Record<string, any>, keys: string[]): any {
+  const normalizedRow: Record<string, any> = {};
 
-    return null;
+  for (const key in row) {
+    const normalizedKey = this.corrigirTexto(key)
+      .toLowerCase()
+      .trim();
+
+    normalizedRow[normalizedKey] = row[key];
   }
+
+  for (const key of keys) {
+    const normalizedKey = this.corrigirTexto(key)
+      .toLowerCase()
+      .trim();
+
+    if (normalizedKey in normalizedRow) {
+      return normalizedRow[normalizedKey];
+    }
+  }
+
+  return null;
+}
 
   private corrigirValor(value: any): any {
     if (value === null || value === undefined) return value;
@@ -472,45 +518,55 @@ export class RelatoriosService {
       .replace(/[\u0300-\u036f]/g, '');
   }
 
-  private normalizarStatusEntrega(value: any): status_entrega_relatorio | null {
-    if (!value) return null;
+private normalizarStatusEntrega(value: any): status_entrega_relatorio | null {
+  if (!value) return null;
 
-    const normalized = this.corrigirTexto(String(value))
-      .trim()
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+  const normalized = this.corrigirTexto(String(value))
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
-    if (
-      normalized.includes('ENTREGUE') ||
-      normalized.includes('FINALIZADO') ||
-      normalized.includes('CONCLUIDO')
-    ) {
-      return 'ENTREGUE';
-    }
-
-    if (
-      normalized.includes('ROTA') ||
-      normalized.includes('EM ANDAMENTO') ||
-      normalized.includes('EM TRANSITO')
-    ) {
-      return 'EM_ROTA';
-    }
-
-    if (normalized.includes('PENDENTE') || normalized.includes('AGUARDANDO')) {
-      return 'PENDENTE';
-    }
-
-    if (
-      normalized.includes('CANCEL') ||
-      normalized.includes('RECUS') ||
-      normalized.includes('FALHA')
-    ) {
-      return 'CANCELADO';
-    }
-
-    return null;
+  if (
+    normalized.includes('ENTREGUE') ||
+    normalized.includes('FINALIZADO') ||
+    normalized.includes('FINALIZADA') ||
+    normalized.includes('CONCLUIDO') ||
+    normalized.includes('CONCLUIDA')
+  ) {
+    return 'ENTREGUE';
   }
+
+  if (
+    normalized.includes('EM ROTA') ||
+    normalized.includes('ROTA') ||
+    normalized.includes('EM ANDAMENTO') ||
+    normalized.includes('EM TRANSITO') ||
+    normalized.includes('SAIU PARA ENTREGA') ||
+    normalized.includes('A CAMINHO')
+  ) {
+    return 'EM_ROTA';
+  }
+
+  if (
+    normalized.includes('PENDENTE') ||
+    normalized.includes('AGUARDANDO') ||
+    normalized.includes('ABERTO') ||
+    normalized.includes('EM ABERTO')
+  ) {
+    return 'PENDENTE';
+  }
+
+  if (
+    normalized.includes('CANCEL') ||
+    normalized.includes('RECUS') ||
+    normalized.includes('FALHA')
+  ) {
+    return 'CANCELADO';
+  }
+
+  return null;
+}
 
   private extrairCidadeDoNomeArquivo(nomeArquivo: string): string | null {
     const nome = this.corrigirTexto(nomeArquivo)
@@ -539,34 +595,42 @@ export class RelatoriosService {
   }
 
   private parseExcelDateTime(value: any): Date | null {
-    if (!value) return null;
+  if (!value) return null;
 
-    if (value instanceof Date) {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-      return new Date(excelEpoch.getTime() + value * 86400000);
-    }
-
-    const texto = this.corrigirTexto(String(value)).trim();
-
-    if (/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(:\d{2})?$/.test(texto)) {
-      const [data, hora] = texto.split(/\s+/);
-      const [dia, mes, ano] = data.split('/');
-      const horaCompleta = hora.length === 5 ? `${hora}:00` : hora;
-      return new Date(`${ano}-${mes}-${dia}T${horaCompleta}`);
-    }
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(texto)) {
-      const [dia, mes, ano] = texto.split('/');
-      return new Date(`${ano}-${mes}-${dia}T00:00:00`);
-    }
-
-    const parsed = new Date(texto);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (value instanceof Date) {
+    return value;
   }
+
+  if (typeof value === 'number') {
+    const excelEpoch = new Date(1899, 11, 30);
+    return new Date(excelEpoch.getTime() + value * 86400000);
+  }
+
+  const texto = this.corrigirTexto(String(value)).trim();
+
+  if (/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(:\d{2})?$/.test(texto)) {
+    const [data, hora] = texto.split(/\s+/);
+    const [dia, mes, ano] = data.split('/').map(Number);
+    const [hh, mm, ss = '0'] = hora.split(':');
+
+    return new Date(
+      ano,
+      mes - 1,
+      dia,
+      Number(hh),
+      Number(mm),
+      Number(ss),
+    );
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(texto)) {
+    const [dia, mes, ano] = texto.split('/').map(Number);
+    return new Date(ano, mes - 1, dia, 12, 0, 0);
+  }
+
+  const parsed = new Date(texto);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
   private parseDecimal(value: any): Prisma.Decimal | null {
     if (value === null || value === undefined || value === '') {
@@ -661,6 +725,207 @@ async deletarMultiplosArquivos(arquivos: string[]) {
     message: 'Arquivos selecionados removidos com sucesso.',
     arquivos: nomes,
     totalRemovido: total,
+  };
+}
+async exportarEntregasParaExcel(filtros: {
+  ids?: string[];
+  cidade?: string;
+  status?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  busca?: string;
+}) {
+  const where: Prisma.relatorios_entregasWhereInput = {};
+  
+
+  if (filtros.ids && filtros.ids.length > 0) {
+    where.id = {
+      in: filtros.ids.map((id) => BigInt(id)),
+    };
+  } else {
+    if (filtros.cidade) {
+      where.cidade = {
+        equals: filtros.cidade,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filtros.status) {
+      where.status = filtros.status as status_entrega_relatorio;
+    }
+
+    if (filtros.dataInicio || filtros.dataFim) {
+      where.data_entrega = {};
+
+      if (filtros.dataInicio) {
+        where.data_entrega.gte = new Date(`${filtros.dataInicio}T00:00:00`);
+      }
+
+      if (filtros.dataFim) {
+        where.data_entrega.lte = new Date(`${filtros.dataFim}T23:59:59`);
+      }
+    }
+
+    if (filtros.busca) {
+      where.OR = [
+        {
+          codigo_entrega: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+        {
+          endereco: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+        {
+          cidade: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+        {
+          entregador_nome: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+        {
+          entregador_telefone: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+        {
+          origem_arquivo: {
+            contains: filtros.busca,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+  }
+
+  const entregas = await this.prisma.relatorios_entregas.findMany({
+    where,
+    orderBy: [{ data_entrega: 'desc' }, { id: 'desc' }],
+  });
+
+  const valores = entregas
+    .map((e) => {
+      if (e.valor_entrega === null || e.valor_entrega === undefined) return null;
+      return Number(e.valor_entrega);
+    })
+    .filter((v): v is number => v !== null && !Number.isNaN(v));
+
+  const valorTotal = valores.reduce((acc, v) => acc + v, 0);
+  const totalComValor = valores.length;
+  const ticketMedio = totalComValor > 0 ? valorTotal / totalComValor : 0;
+  const maiorEntrega = totalComValor > 0 ? Math.max(...valores) : 0;
+  const menorEntrega = totalComValor > 0 ? Math.min(...valores) : 0;
+
+  const totalEntregas = entregas.length;
+  const entregues = entregas.filter((e) => e.status === 'ENTREGUE').length;
+  const emRota = entregas.filter((e) => e.status === 'EM_ROTA').length;
+  const pendentes = entregas.filter((e) => e.status === 'PENDENTE').length;
+  const canceladas = entregas.filter((e) => e.status === 'CANCELADO').length;
+  
+  const ganhoPorEntrega = 0.6;
+  const ganhoTotal = totalEntregas * ganhoPorEntrega;
+
+  const workbook = new ExcelJS.Workbook();
+
+  // Aba de resumo financeiro e operacional
+  const resumo = workbook.addWorksheet('Resumo');
+
+  resumo.columns = [
+    { header: 'Indicador', key: 'indicador', width: 28 },
+    { header: 'Valor', key: 'valor', width: 20 },
+  ];
+
+  resumo.addRows([
+  { indicador: 'Total de Entregas', valor: totalEntregas },
+  { indicador: 'Entregues', valor: entregues },
+  { indicador: 'Em Rota', valor: emRota },
+  { indicador: 'Pendentes', valor: pendentes },
+  { indicador: 'Canceladas', valor: canceladas },
+
+  { indicador: 'Registros com Valor', valor: totalComValor },
+
+  { indicador: 'Valor Total das Entregas', valor: valorTotal },
+  { indicador: 'Ticket Médio', valor: ticketMedio },
+  { indicador: 'Maior Entrega', valor: maiorEntrega },
+  { indicador: 'Menor Entrega', valor: menorEntrega },
+
+  { indicador: 'Ganho por Entrega', valor: ganhoPorEntrega },
+  { indicador: 'Ganho Total', valor: ganhoTotal },
+]);
+
+  resumo.getRow(1).font = { bold: true };
+
+  for (let i = 2; i <= resumo.rowCount; i++) {
+    const indicador = resumo.getCell(`A${i}`).value;
+
+    if (
+  indicador === 'Valor Total das Entregas' ||
+  indicador === 'Ticket Médio' ||
+  indicador === 'Maior Entrega' ||
+  indicador === 'Menor Entrega' ||
+  indicador === 'Ganho por Entrega' ||
+  indicador === 'Ganho Total'
+) {
+      resumo.getCell(`B${i}`).numFmt = 'R$ #,##0.00';
+    }
+  }
+
+  // Aba original com os dados detalhados
+  const worksheet = workbook.addWorksheet('Entregas');
+
+  worksheet.columns = [
+    { header: 'ID', key: 'id', width: 18 },
+    { header: 'Código', key: 'codigo', width: 20 },
+    { header: 'Endereço', key: 'endereco', width: 40 },
+    { header: 'Cidade', key: 'cidade', width: 20 },
+    { header: 'Data Entrega', key: 'dataEntrega', width: 22 },
+    { header: 'Status', key: 'status', width: 18 },
+    { header: 'Valor', key: 'valorEntrega', width: 18 },
+    { header: 'Entregador', key: 'entregadorNome', width: 25 },
+    { header: 'Telefone', key: 'entregadorTelefone', width: 20 },
+    { header: 'Arquivo Origem', key: 'origemArquivo', width: 35 },
+  ];
+
+  entregas.forEach((item) => {
+    worksheet.addRow({
+      id: item.id.toString(),
+      codigo: item.codigo_entrega ?? '',
+      endereco: item.endereco ?? '',
+      cidade: item.cidade ?? '',
+      dataEntrega: item.data_entrega
+        ? new Date(item.data_entrega).toLocaleString('pt-BR')
+        : '',
+      status: item.status ?? '',
+      valorEntrega: item.valor_entrega ? Number(item.valor_entrega) : '',
+      entregadorNome: item.entregador_nome ?? '',
+      entregadorTelefone: item.entregador_telefone ?? '',
+      origemArquivo: item.origem_arquivo ?? '',
+    });
+  });
+
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.getColumn('valorEntrega').numFmt = 'R$ #,##0.00';
+
+  const nomeArquivo =
+    filtros.ids && filtros.ids.length > 0
+      ? 'entregas-selecionadas.xlsx'
+      : 'relatorio-entregas.xlsx';
+
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  return {
+    nomeArquivo,
+    buffer: Buffer.from(buffer),
   };
 }
 async deletarEntregasSelecionadas(ids: string[]) {

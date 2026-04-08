@@ -176,7 +176,7 @@ model relatorios_entregas {
   codigo_entrega         String?                  @db.VarChar(50)
   endereco               String?                  @db.VarChar(255)
   cidade                 String?                  @db.VarChar(100)
-  data_entrega           DateTime?                @db.Timestamp(6)
+  data_entrega           DateTime?                @db.Timestamp(3)          
   status                 status_entrega_relatorio?
   valor_entrega          Decimal?                 @db.Decimal(10, 2)
   entregador_nome        String?                  @db.VarChar(150)

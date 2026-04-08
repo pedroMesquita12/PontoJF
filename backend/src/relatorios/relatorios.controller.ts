@@ -7,9 +7,11 @@ import {
   UploadedFile,
   Body,
   UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RelatoriosService } from './relatorios.service';
+import { Response } from 'express';
 
 @Controller('admin/relatorios')
 export class RelatoriosController {
@@ -74,4 +76,30 @@ export class RelatoriosController {
   async deletarEntregasSelecionadas(@Body('ids') ids: string[]) {
     return this.relatoriosService.deletarEntregasSelecionadas(ids);
   }
+  @Post('entregas/exportar')
+async exportarEntregas(
+  @Body()
+  body: {
+    ids?: string[];
+    cidade?: string;
+    status?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    busca?: string;
+  },
+  @Res() res: Response,
+) {
+  const arquivo = await this.relatoriosService.exportarEntregasParaExcel(body);
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${arquivo.nomeArquivo}"`,
+  );
+
+  res.send(arquivo.buffer);
+}
 }
