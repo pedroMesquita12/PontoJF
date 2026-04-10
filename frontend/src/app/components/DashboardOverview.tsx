@@ -13,27 +13,49 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
+/**
+ * Dados do usuário para exibição
+ */
 type UserData = {
   matricula: string;
   nome: string;
   cargo: string;
 };
 
+/**
+ * Props do componente DashboardOverview
+ */
 type DashboardOverviewProps = {
-  userData: UserData;
+  userData: UserData; // Dados do usuário logado
 };
 
+/**
+ * Componente Overview do Dashboard
+ * 
+ * Responsabilidades:
+ * - Exibir resumo do dia do funcionário
+ * - Mostrar KPIs principais
+ * - Exibir atividades recentes
+ * - Exibir progresso de metas
+ * 
+ * Informações exibidas:
+ * 1. Saudação personalizada
+ * 2. KPIs: Entregas, horas trabalhadas, status
+ * 3. Atividades recentes
+ * 4. Progresso mensal
+ */
 export function DashboardOverview({ userData }: DashboardOverviewProps) {
-  // Mock data
+  // Mock data - Estatísticas do dia
   const stats = {
-    entregasHoje: 12,
-    entregasSemana: 58,
-    pacotesRecebidos: 145,
-    horasTrabalhadas: "6h 32min",
-    statusPonto: "fora",
-    metaMensal: 75, // porcentagem
+    entregasHoje: 12,           // Entregas realizadas hoje
+    entregasSemana: 58,         // Entregas da semana
+    pacotesRecebidos: 145,      // Pacotes recebidos
+    horasTrabalhadas: "6h 32min", // Tempo trabalhado até agora
+    statusPonto: "fora",         // Status atual (fora, trabalhando, pausa)
+    metaMensal: 75,              // Percentual da meta mensal
   };
 
+  // Mock data - Atividades recentes
   const recentActivities = [
     { id: 1, type: "entrega", description: "Entrega #1234 concluída", time: "14:32", status: "success" },
     { id: 2, type: "pacote", description: "Pacote #5678 recebido", time: "13:15", status: "info" },
@@ -43,17 +65,21 @@ export function DashboardOverview({ userData }: DashboardOverviewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
+      {/* ===== SEÇÃO DE SAUDAÇÃO ===== */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
+        {/* Card com saudação e dados do funcionário */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white shadow-lg">
-          <h2 className="text-2xl font-bold mb-2">Bem-vindo, {userData.nome.split(' ')[0]}! 👋</h2>
+          {/* Saudação personalizada */}
+          <h2 className="text-2xl font-bold mb-2">Bem-vindo, {(userData?.nome || "").split(" ")[0]}! 👋</h2>
+          {/* Cargo e matrícula */}
           <p className="text-blue-100">
             {userData.cargo} - Matrícula {userData.matricula}
           </p>
+          {/* Data atual */}
           <div className="mt-4 flex items-center gap-2">
             <Calendar className="size-4" />
             <span className="text-sm text-blue-100">
@@ -68,7 +94,7 @@ export function DashboardOverview({ userData }: DashboardOverviewProps) {
         </div>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Status Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

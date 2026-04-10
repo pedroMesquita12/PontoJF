@@ -30,20 +30,32 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
+/**
+ * Tipo para entrada de ponto (entrada/saída/pausa)
+ */
 type TimeEntry = {
-  id: string;
-  type: "entrada" | "saida" | "pausa_inicio" | "pausa_fim";
-  timestamp: Date;
+  id: string;              // ID do registro
+  type: "entrada" | "saida" | "pausa_inicio" | "pausa_fim"; // Tipo normalizado para UI
+  timestamp: Date;         // Data/hora formatada
 };
 
+/**
+ * Tipo para resposta da API (dados brutos)
+ */
 type ApiTimeEntry = {
   id: number | string;
-  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO";
+  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO"; // Tipo retornado da API
   data_hora: string;
 };
 
+/**
+ * Status do funcionário em tempo real
+ */
 type WorkStatus = "fora" | "trabalhando" | "pausa";
 
+/**
+ * Dados do usuário autenticado
+ */
 type UserData = {
   id: number;
   usuarioId: number;
@@ -54,30 +66,55 @@ type UserData = {
   perfil: string;
 };
 
+/**
+ * Props do componente TimeClockApp
+ */
 type TimeClockAppProps = {
-  userData: UserData;
-  onLogout: () => void;
-  hideHeader?: boolean;
+  userData: UserData;     // Dados do usuário logado
+  onLogout: () => void;   // Callback para logout
+  hideHeader?: boolean;   // Flag para esconder header (uso em dashboard embarcado)
 };
 
+/**
+ * Componente de Relógio de Ponto (TimeClockApp)
+ * 
+ * Responsabilidades:
+ * - Exibir relógio em tempo real
+ * - Registrar entrada/saída do funcionário
+ * - Solicitar localização por GPS
+ * - Calcular tempo trabalhado e pausa
+ * - Listar histórico de pontos do dia
+ * - Mostrar status atual do funcionário
+ * 
+ * Fluxo de funcionamento:
+ * 1. Carrega pontos do funcionário
+ * 2. Atualiza hora a cada segundo
+ * 3. Calcula status e tempos
+ * 4. Permite registrar novo ponto com GPS
+ * 5. Atualiza lista de pontos
+ */
 export function TimeClockApp({
   userData,
   onLogout,
   hideHeader = false,
 }: TimeClockAppProps) {
+  // Estado: Hora atual para relógio
   const [currentTime, setCurrentTime] = useState(new Date());
+  // Estado: Status atual do funcionário (fora, trabalhando, pausa)
   const [workStatus, setWorkStatus] = useState<WorkStatus>("fora");
+  // Estado: Lista de pontos registrados
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  // Estado: Tempo trabalhado em minutos
   const [workedTime, setWorkedTime] = useState(0);
+  // Estado: Tempo de pausa em minutos
   const [pauseTime, setPauseTime] = useState(0);
 
+  // ID do funcionário
   const funcionarioId = userData.id;
-  const deliveriesToday = 12;4
+  // Entregas do dia (valor mockado)
+  const deliveriesToday = 12;
+  // Data atual
   const [dataAtual, setDataAtual] = useState(new Date());
-
-  useEffect(() => {
-  const timer = setInterval(() => {
-    const agora = new Date();
 
     setCurrentTime(agora);
 

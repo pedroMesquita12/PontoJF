@@ -20,23 +20,49 @@ import DeliveryReports from "./DeliveryReports";
 import { PackageEntry } from "./PackageEntry";
 import { DashboardOverview } from "./DashboardOverview";
 
+/**
+ * Dados do usuário que são exibidos no dashboard
+ */
 type UserData = {
-  matricula: string;
-  nome: string;
-  cargo: string;
+  matricula: string;  // Matrícula do funcionário
+  nome: string;       // Nome completo
+  cargo: string;      // Cargo/função
 };
 
+/**
+ * Props do componente Dashboard
+ */
 type DashboardProps = {
-  userData: UserData;
-  onLogout: () => void;
+  userData: UserData; // Dados do usuário logado
+  onLogout: () => void; // Callback para logout
 };
 
+/**
+ * Componente Dashboard (Principal)
+ * 
+ * Responsabilidades:
+ * - Exibir interface principal após login
+ * - Gerenciar abas de navegação
+ * - Exibir:
+ *   1. Overview: Resumo do dia
+ *   2. Ponto: Relógio eletrônico
+ *   3. Entregas: Relatório de entregas
+ *   4. Registros: Pacotes/registros
+ * - Exibir informações do usuário
+ * - Permitir logout
+ * 
+ * Layout:
+ * - Header: Logo, nome do usuário, botão logout
+ * - Abas: Navegação entre seções
+ * - Conteúdo: Seção ativa
+ */
 export function Dashboard({ userData, onLogout }: DashboardProps) {
+  // Estado: Aba ativa (overview, ponto, entregas, registros)
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
+      {/* ===== HEADER ===== */}
       <header className="bg-white border-b shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -51,12 +77,14 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
               </div>
             </div>
 
-            {/* User Info */}
+            {/* Informações do Usuário e Logout */}
             <div className="flex items-center gap-4">
+              {/* Nome, cargo e matrícula (oculto em mobile) */}
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-slate-900">{userData.nome}</p>
                 <p className="text-xs text-slate-600">{userData.cargo} - Mat. {userData.matricula}</p>
               </div>
+              {/* Botão de logout */}
               <Button
                 variant="outline"
                 size="sm"
@@ -71,11 +99,12 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {/* Navigation Tabs */}
+          {/* Abas de navegação */}
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid h-auto p-1">
+            {/* Aba: Overview */}
             <TabsTrigger value="overview" className="gap-2 py-2.5">
               <Home className="size-4" />
               <span className="hidden sm:inline">Visão Geral</span>

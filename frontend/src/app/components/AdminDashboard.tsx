@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
+/**
+ * Dados do usuário administrador
+ */
 type UserData = {
   id: number;
   usuarioId: number;
@@ -30,28 +33,31 @@ type UserData = {
   isAdmin: boolean;
 };
 
+/**
+ * Estrutura de dados do overview/dashboard administrativo
+ */
 type OverviewData = {
   stats: {
-    totalFuncionarios: number;
-    trabalhando: number;
-    emPausa: number;
-    fora: number;
-    taxaPresenca: number;
-    registrosHoje: number;
-    registrosMes: number;
+    totalFuncionarios: number;  // Total de funcionários ativos
+    trabalhando: number;        // Em trabalho agora
+    emPausa: number;            // Em pausa/almoço
+    fora: number;               // Fora/não registrado
+    taxaPresenca: number;       // Percentual de presença
+    registrosHoje: number;      // Total de registros hoje
+    registrosMes: number;       // Total de registros no mês
   };
-  weeklyData: {
+  weeklyData: {                 // Dados por dia da semana
     dia: string;
     funcionarios: number;
     horas: number;
   }[];
-  topFuncionarios: {
+  topFuncionarios: {            // Top 3 com maior carga horária
     nome: string;
     cargo: string;
     horasSemana: string;
     horasDia: string;
   }[];
-  alerts: {
+  alerts: {                     // Alertas e notificações
     id: string;
     type: "warning" | "info" | "success";
     message: string;
@@ -59,21 +65,50 @@ type OverviewData = {
   }[];
 };
 
+/**
+ * Props do AdminDashboard
+ */
 type AdminDashboardProps = {
-  userData: UserData;
-  onLogout: () => void;
+  userData: UserData;   // Dados do usuário admin logado
+  onLogout: () => void; // Callback para logout
 };
 
+// URL base da API
 const API_URL = "/api";
 
+/**
+ * Componente Admin Dashboard
+ * 
+ * Responsabilidades:
+ * - Exibir interface administrativa
+ * - Gerenciar abas de navegação
+ * - Carregar overview com estatísticas
+ * - Exibir:
+ *   1. Overview: Dashboard com KPIs
+ *   2. Funcionários: Registros de ponto
+ *   3. Gestão: Gerenciamento de pacotes
+ *   4. Desenvolvimento: Análises
+ * - Exibir informações do admin
+ * - Permitir logout
+ * 
+ * Layout:
+ * - Header: Logo, nome do admin, botão logout
+ * - Abas: Navegação entre seções
+ * - Conteúdo: Seção ativa com dados carregados
+ */
 export function AdminDashboard({ userData, onLogout }: AdminDashboardProps) {
+  // Estado: Aba ativa (overview, funcionarios, gestao, etc)
   const [activeTab, setActiveTab] = useState("overview");
+  // Estado: Dados do overview carregados da API
   const [overview, setOverview] = useState<OverviewData | null>(null);
 
+  // Efeito: Carrega overview ao montar componente
   useEffect(() => {
     const carregarOverview = async () => {
       try {
+        // Usa data de hoje
         const hoje = new Date().toISOString().split("T")[0];
+        // Busca dados do overview da API
         const response = await fetch(`${API_URL}/admin/overview?date=${hoje}`);
 
         if (!response.ok) {

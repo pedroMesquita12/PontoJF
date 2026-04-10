@@ -9,38 +9,79 @@ import * as ExcelJS from 'exceljs';
 import { parse } from 'csv-parse/sync';
 import * as iconv from 'iconv-lite';
 
+/**
+ * Tipo para filtros de busca de entregas
+ */
 type FiltrosEntregas = {
-  cidade?: string;
-  status?: string;
-  dataInicio?: string;
-  dataFim?: string;
-  busca?: string;
+  cidade?: string;           // Filtrar por cidade
+  status?: string;           // Filtrar por status (PENDENTE, EM_ROTA, ENTREGUE, etc)
+  dataInicio?: string;       // Data inicial (YYYY-MM-DD)
+  dataFim?: string;          // Data final (YYYY-MM-DD)
+  busca?: string;            // Busca por texto em múltiplos campos
 };
 
+/**
+ * Serviço de Relatórios (RelatoriosService)
+ * 
+ * Responsabilidades:
+ * - Importar dados de entregas (CSV/XLSX)
+ * - Listar e filtrar relatórios
+ * - Exportar dados para Excel
+ * - Deletar registros e arquivos
+ * - Mapear linhas de arquivo para modelos de dados
+ * - Corrigir codificação de texto
+ * - Gerar estatísticas de entregas
+ * 
+ * Formatos suportados:
+ * - XLSX (Excel)
+ * - CSV (Valores separados por vírgula)
+ */
 @Injectable()
 export class RelatoriosService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Importa relatório de entregas do arquivo enviado
+   * 
+   * Processo:
+   * 1. Valida se arquivo foi enviado
+   * 2. Verifica extensão (.xlsx ou .csv)
+   * 3. Extrai linhas do arquivo
+   * 4. Mapeia linhas para formato de banco
+   * 5. Cria registro de importação
+   * 6. Persiste entregas no banco
+   * 
+   * @param file - Arquivo enviado (Buffer + metadata)
+   * @param usuarioId - ID do usuário que importa (opcional)
+   * @returns Resultado da importação com total de registros
+   * @throws BadRequestException - Se arquivo inválido ou vazio
+   */
   async importarRelatorioEntregas(file: any, usuarioId?: bigint) {
+    // Validação 1: Verifica se arquivo foi enviado
     if (!file) {
       throw new BadRequestException('Arquivo não enviado.');
     }
 
+    // Corrige codificação e extrai nome original do arquivo
     const originalName = this.corrigirTexto(file.originalname || '');
     const lowerName = originalName.toLowerCase();
 
+    // Validação 2: Verifica extensão do arquivo
     if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.csv')) {
       throw new BadRequestException('Apenas arquivos .xlsx ou .csv são permitidos.');
     }
 
+    // Etapa 1: Extrai linhas do arquivo (CSV ou XLSX)
     const rows = lowerName.endsWith('.csv')
       ? this.extrairLinhasDoCsv(file.buffer)
       : await this.extrairLinhasDoXlsx(file.buffer);
 
+    // Validação 3: Verifica se arquivo contém dados
     if (!rows.length) {
       throw new BadRequestException('Nenhum dado encontrado no arquivo.');
     }
 
+    // Etapa 2: Cria registro de importação no banco
     const importacao = await this.prisma.importacoes_relatorios.create({
       data: {
         nome_arquivo: originalName,
@@ -49,20 +90,24 @@ export class RelatoriosService {
       },
     });
 
+    // Etapa 3: Mapeia linhas do arquivo para objetos de banco
     const registros = rows
       .map((row) => this.mapearLinhaEntrega(row, originalName, importacao.id))
       .filter(Boolean) as Prisma.relatorios_entregasCreateManyInput[];
 
+    // Validação 4: Verifica se algum registro válido foi identificado
     if (!registros.length) {
       throw new BadRequestException(
         'Nenhum registro válido de entrega foi identificado no arquivo.',
       );
     }
 
+    // Etapa 4: Persiste entregas no banco em lote
     await this.prisma.relatorios_entregas.createMany({
       data: registros,
     });
 
+    // Retorna resultado da importação
     return {
       message: 'Relatório importado com sucesso.',
       importacaoId: importacao.id.toString(),
@@ -71,9 +116,23 @@ export class RelatoriosService {
     };
   }
 
+  /**
+   * Lista relatórios de entregas com filtros opcionais
+   * 
+   * Filtros disponíveis:
+   * - cidade: Busca exata (case-insensitive)
+   * - status: PENDENTE, EM_ROTA, ENTREGUE, CANCELADO
+   * - data: Período entre dataInicio e dataFim
+   * - busca: Busca em múltiplos campos (código, endereço, etc)
+   * 
+   * @param filters - Objeto com filtros opcionais
+   * @returns Objeto com entregas e estatísticas resumidas
+   */
   async listarRelatoriosEntregas(filters: FiltrosEntregas) {
+    // Constrói objeto de filtro Prisma dinamicamente
     const where: Prisma.relatorios_entregasWhereInput = {};
 
+    // Filtro por cidade (case-insensitive)
     if (filters.cidade) {
       where.cidade = {
         equals: filters.cidade,
@@ -81,22 +140,27 @@ export class RelatoriosService {
       };
     }
 
+    // Filtro por status
     if (filters.status) {
       where.status = filters.status as status_entrega_relatorio;
     }
 
+    // Filtro por período (data_inicio até data_fim)
     if (filters.dataInicio || filters.dataFim) {
       where.data_entrega = {};
 
       if (filters.dataInicio) {
+        // Início do dia 00:00:00
         where.data_entrega.gte = new Date(`${filters.dataInicio}T00:00:00`);
       }
 
       if (filters.dataFim) {
+        // Final do dia 23:59:59
         where.data_entrega.lte = new Date(`${filters.dataFim}T23:59:59`);
       }
     }
 
+    // Filtro por busca textual em múltiplos campos
     if (filters.busca) {
       where.OR = [
         {
@@ -138,148 +202,207 @@ export class RelatoriosService {
       ];
     }
 
+    // Busca entregas ordenadas por data (mais recente primeiro)
     const entregas = await this.prisma.relatorios_entregas.findMany({
       where,
       orderBy: [{ data_entrega: 'desc' }, { id: 'desc' }],
     });
 
+    // Etapa: Calcula estatísticas dos resultados
     const totalEntregas = entregas.length;
     const entregues = entregas.filter((e) => e.status === 'ENTREGUE').length;
     const emRota = entregas.filter((e) => e.status === 'EM_ROTA').length;
     const pendentes = entregas.filter((e) => e.status === 'PENDENTE').length;
     const canceladas = entregas.filter((e) => e.status === 'CANCELADO').length;
-    
-    // ===== FINANCEIRO =====
-const valores = entregas
-  .map((e) => {
-    if (e.valor_entrega === null || e.valor_entrega === undefined) return null;
-    return Number(e.valor_entrega);
-  })
-  .filter((v): v is number => v !== null && !Number.isNaN(v));
+    // ===== CÁLCULO DE ESTATÍSTICAS FINANCEIRAS =====
+    // Processa valores de entrega (converte null em number válido)
+    const valores = entregas
+      .map((e) => {
+        if (e.valor_entrega === null || e.valor_entrega === undefined) return null;
+        return Number(e.valor_entrega);
+      })
+      .filter((v): v is number => v !== null && !Number.isNaN(v));
 
-const valorTotal = valores.reduce((acc, v) => acc + v, 0);
-const totalComValor = valores.length;
-const ticketMedio = totalComValor > 0 ? valorTotal / totalComValor : 0;
-const maiorEntrega = totalComValor > 0 ? Math.max(...valores) : 0;
-const menorEntrega = totalComValor > 0 ? Math.min(...valores) : 0;
+    // Calcula totalizações financeiras
+    const valorTotal = valores.reduce((acc, v) => acc + v, 0); // Soma total de valores
+    const totalComValor = valores.length; // Quantidade com valor preenchido
+    const ticketMedio = totalComValor > 0 ? valorTotal / totalComValor : 0; // Valor médio por entrega
+    const maiorEntrega = totalComValor > 0 ? Math.max(...valores) : 0; // Maior entrega
+    const menorEntrega = totalComValor > 0 ? Math.min(...valores) : 0; // Menor entrega
 
+    // Retorna objeto com estatísticas e dados das entregas
     return {
-  stats: {
-    totalEntregas,
-    entregues,
-    emRota,
-    pendentes,
-    canceladas,
-  },
+      // Estatísticas por status
+      stats: {
+        totalEntregas,
+        entregues,
+        emRota,
+        pendentes,
+        canceladas,
+      },
 
-  financeiro: {
-    valorTotal,
-    ticketMedio,
-    maiorEntrega,
-    menorEntrega,
-    totalComValor,
-  },
+      // Estatísticas financeiras
+      financeiro: {
+        valorTotal,
+        ticketMedio,
+        maiorEntrega,
+        menorEntrega,
+        totalComValor,
+      },
 
-  entregas: entregas.map((item) => ({
-    id: item.id.toString(),
-    codigo: item.codigo_entrega,
-    endereco: item.endereco,
-    cidade: item.cidade,
-    dataEntrega: item.data_entrega,
-    status: item.status,
-    valorEntrega: item.valor_entrega,
-    entregadorNome: item.entregador_nome,
-    entregadorTelefone: item.entregador_telefone,
-    origemArquivo: item.origem_arquivo,
-  })),
-};
+      // Array com dados das entregas
+      entregas: entregas.map((item) => ({
+        id: item.id.toString(),
+        codigo: item.codigo_entrega,
+        endereco: item.endereco,
+        cidade: item.cidade,
+        dataEntrega: item.data_entrega,
+        status: item.status,
+        valorEntrega: item.valor_entrega,
+        entregadorNome: item.entregador_nome,
+        entregadorTelefone: item.entregador_telefone,
+        origemArquivo: item.origem_arquivo,
+      })),
+    };
   }
-  
+
+  /**
+   * Lista todas as cidades com entregas registradas
+   * @returns Array de nomes únicos de cidades em ordem alfabética
+   */
   async listarCidadesEntregas() {
+    // Busca cidades únicas (sem null)
     const cidades = await this.prisma.relatorios_entregas.findMany({
       where: {
         cidade: {
-          not: null,
+          not: null, // Exclui registros sem cidade
         },
       },
       select: {
-        cidade: true,
+        cidade: true, // Seleciona apenas o campo cidade
       },
-      distinct: ['cidade'],
+      distinct: ['cidade'], // Retorna valores únicos
       orderBy: {
-        cidade: 'asc',
+        cidade: 'asc', // Ordena alfabeticamente
       },
     });
 
+    // Mapeia e filtra para retornar apenas strings válidas
     return cidades
       .map((item) => item.cidade)
       .filter((cidade): cidade is string => Boolean(cidade));
   }
 
+  /**
+   * Extrai linhas de um arquivo XLSX (Excel)
+   * 
+   * Processo:
+   * 1. Carrega arquivo XLSX em memória
+   * 2. Valida presença de abas
+   * 3. Identifica linha de cabeçalho
+   * 4. Normaliza nomes das colunas
+   * 5. Mapeia dados restantes
+   * 6. Filtra linhas vazias
+   * 
+   * @param buffer - Buffer contendo dados do arquivo XLSX
+   * @returns Array de objetos com dados do arquivo
+   * @throws BadRequestException - Se arquivo inválido
+   */
   private async extrairLinhasDoXlsx(
-  buffer: Buffer | Uint8Array,
-): Promise<Record<string, any>[]> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+    buffer: Buffer | Uint8Array,
+  ): Promise<Record<string, any>[]> {
+    // Carrega arquivo XLSX em memória
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
 
-  const worksheet = workbook.worksheets[0];
+    // Obtém primeira aba da planilha
+    const worksheet = workbook.worksheets[0];
 
-  if (!worksheet) {
-    throw new BadRequestException('A planilha não possui abas válidas.');
+    // Valida presença de abas
+    if (!worksheet) {
+      throw new BadRequestException('A planilha não possui abas válidas.');
+    }
+
+    // Array para armazenar todas as linhas
+    const linhas: any[][] = [];
+
+    // Itera sobre todas as linhas da planilha
+    worksheet.eachRow((row) => {
+      // Extrai valores (row.values[0] é sempre undefined, começa em 1)
+      const valores = Array.isArray(row.values) ? row.values.slice(1) : [];
+      // Corrige valores de cada célula
+      linhas.push(valores.map((cell) => this.corrigirValor(cell)));
+    });
+
+    // Identifica qual linha contém o cabeçalho
+    const headerIndex = this.encontrarLinhaCabecalho(linhas);
+
+    // Valida se cabeçalho foi encontrado
+    if (headerIndex === -1) {
+      throw new BadRequestException(
+        'Não foi possível localizar o cabeçalho da planilha.',
+      );
+    }
+
+    // Extrai nomes das colunas do cabeçalho
+    const headers = linhas[headerIndex].map((cell) =>
+      this.normalizarCabecalho(cell),
+    );
+
+    // Obtém apenas as linhas de dados (após cabeçalho)
+    const dataRows = linhas.slice(headerIndex + 1);
+
+    // Mapeia linhas para objetos com chaves nomeadas
+    return dataRows
+      .map((row) => {
+        const obj: Record<string, any> = {};
+
+        // Associa cada valor à sua coluna correspondente
+        headers.forEach((header, index) => {
+          if (!header) return;
+          obj[header] = row[index] ?? null;
+        });
+
+        return obj;
+      })
+      .filter((row) =>
+        // Filtra apenas linhas que possuem ao menos um valor não-vazio
+        Object.values(row).some(
+          (value) => value !== null && String(value).trim() !== '',
+        ),
+      );
   }
 
-  const linhas: any[][] = [];
-
-  worksheet.eachRow((row) => {
-    const valores = Array.isArray(row.values) ? row.values.slice(1) : [];
-    linhas.push(valores.map((cell) => this.corrigirValor(cell)));
-  });
-
-  const headerIndex = this.encontrarLinhaCabecalho(linhas);
-
-  if (headerIndex === -1) {
-    throw new BadRequestException(
-      'Não foi possível localizar o cabeçalho da planilha.',
-    );
-  }
-
-  const headers = linhas[headerIndex].map((cell) =>
-    this.normalizarCabecalho(cell),
-  );
-
-  const dataRows = linhas.slice(headerIndex + 1);
-
-  return dataRows
-    .map((row) => {
-      const obj: Record<string, any> = {};
-
-      headers.forEach((header, index) => {
-        if (!header) return;
-        obj[header] = row[index] ?? null;
-      });
-
-      return obj;
-    })
-    .filter((row) =>
-      Object.values(row).some(
-        (value) => value !== null && String(value).trim() !== '',
-      ),
-    );
-}
-
+  /**
+   * Extrai linhas de um arquivo CSV (Valores separados por vírgula)
+   * 
+   * Processo:
+   * 1. Decodifica buffer para texto
+   * 2. Detecta delimitador (vírgula, ponto-e-vírgula, etc)
+   * 3. Parseia CSV com coluna automática
+   * 4. Normaliza nomes das colunas
+   * 5. Filtra linhas vazias
+   * 
+   * @param buffer - Buffer contendo dados do arquivo CSV
+   * @returns Array de objetos com dados do arquivo
+   */
   private extrairLinhasDoCsv(buffer: Buffer | Uint8Array): Record<string, any>[] {
+    // Decodifica buffer para texto
     const texto = this.decodeCsv(buffer);
+    // Detecta qual delimitador é usado (vírgula, ponto-e-vírgula, etc)
     const delimiter = this.detectarDelimitador(texto);
 
+    // Parseia CSV com colunas detectadas automaticamente
     const records = parse(texto, {
-      columns: true,
-      skip_empty_lines: true,
-      bom: true,
-      delimiter,
-      trim: true,
-      relax_column_count: true,
+      columns: true, // Primeira linha como cabeçalho
+      skip_empty_lines: true, // Ignora linhas vazias
+      bom: true, // Detecta BOM (Byte Order Mark)
+      delimiter, // Usa delimitador detectado
+      trim: true, // Remove espaços em branco
+      relax_column_count: true, // Ignora linhas com colunas faltando
     }) as Record<string, any>[];
 
+    // Retorna registros com colunas normalizadas e linhas vazias filtradas
     return records
       .map((row) => {
         const obj: Record<string, any> = {};

@@ -18,45 +18,81 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
+/**
+ * Dados do usuário
+ */
 type UserData = {
   matricula: string;
   nome: string;
   cargo: string;
 };
 
+/**
+ * Props do componente PackageEntry
+ */
 type PackageEntryProps = {
-  userData: UserData;
+  userData: UserData; // Dados do usuário logado
 };
 
+/**
+ * Tipo para item de pacote registrado
+ */
 type PackageItem = {
-  id: string;
-  codigo: string;
-  destinatario: string;
-  endereco: string;
-  timestamp: Date;
+  id: string;              // ID único (UUID)
+  codigo: string;          // Código/tracking do pacote
+  destinatario: string;    // Nome do destinatário
+  endereco: string;        // Endereço de entrega
+  timestamp: Date;         // Data/hora do registro
 };
 
+/**
+ * Componente Entrada de Pacotes (PackageEntry)
+ * 
+ * Responsabilidades:
+ * - Permitir registro de pacotes recebidos
+ * - Validar dados de entrada
+ * - Exibir lista de pacotes registrados
+ * - Suporte para scan de código (futuro)
+ * 
+ * Funcionalidades:
+ * 1. Formulário: Código, destinatário, endereço
+ * 2. Validação: Todos os campos obrigatórios
+ * 3. Armazenamento local: Persiste na sessão
+ * 4. Listagem: Exibe pacotes registrados
+ */
 export function PackageEntry({ userData }: PackageEntryProps) {
+  // Estado: Código do pacote
   const [codigo, setCodigo] = useState("");
+  // Estado: Nome do destinatário
   const [destinatario, setDestinatario] = useState("");
+  // Estado: Endereço de entrega
   const [endereco, setEndereco] = useState("");
+  // Estado: Lista de pacotes registrados
   const [packages, setPackages] = useState<PackageItem[]>([]);
+  // Estado: Indicador de scanning (futuro)
   const [isScanning, setIsScanning] = useState(false);
 
+  /**
+   * Manipulador do formulário de registro de pacote
+   * Valida dados, cria novo pacote e adiciona à lista
+   */
   const handleSubmit = (e: React.FormEvent) => {
+    // Previne comportamento padrão
     e.preventDefault();
 
+    // Validação: Todos os campos obrigatórios
     if (!codigo || !destinatario || !endereco) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
 
+    // Cria novo pacote
     const newPackage: PackageItem = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // Gera ID único
       codigo,
       destinatario,
       endereco,
-      timestamp: new Date(),
+      timestamp: new Date(), // Data/hora atual
     };
 
     setPackages([newPackage, ...packages]);

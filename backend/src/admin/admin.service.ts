@@ -1,9 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * Tipos de registro de ponto
+ */
 type TipoRegistro = 'ENTRADA' | 'SAIDA' | 'SAIDA_ALMOCO' | 'VOLTA_ALMOCO';
+
+/**
+ * Status do funcionário em tempo real
+ */
 type StatusFuncionario = 'trabalhando' | 'pausa' | 'fora';
 
+/**
+ * Tipo para registro de ponto do banco de dados
+ */
 type RegistroPonto = {
   id: bigint;
   funcionario_id: bigint;
@@ -12,18 +22,44 @@ type RegistroPonto = {
   data_referencia: Date;
 };
 
+/**
+ * Serviço Administrativo (AdminService)
+ * 
+ * Responsabilidades:
+ * - Listar funcionários com status de ponto
+ * - Calcular resumo de pontos (diário, semanal, mensal)
+ * - Gerar relatório overview para dashboard
+ * - Calcular tempo trabalhado por funcionário
+ * - Mapear tipos de ponto para formato UI
+ * - Formatar datas/horas para fuso horário brasileiro
+ */
 @Injectable()
 export class AdminService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Retorna início do dia (00:00:00)
+   * @param dateString - Data no formato YYYY-MM-DD
+   * @returns Date com horário às 00:00:00
+   */
   private getStartOfDay(dateString: string) {
     return new Date(`${dateString}T00:00:00`);
   }
 
+  /**
+   * Retorna fim do dia (23:59:59.999)
+   * @param dateString - Data no formato YYYY-MM-DD
+   * @returns Date com horário às 23:59:59
+   */
   private getEndOfDay(dateString: string) {
     return new Date(`${dateString}T23:59:59.999`);
   }
 
+  /**
+   * Calcula início da semana (segunda-feira)
+   * @param date - Data de referência
+   * @returns Date do primeiro dia da semana (segunda) às 00:00:00
+   */
   private getStartOfWeek(date: Date) {
     const d = new Date(date);
     const day = d.getDay(); // 0 domingo, 1 segunda...
@@ -33,6 +69,11 @@ export class AdminService {
     return d;
   }
 
+  /**
+   * Calcula fim da semana (domingo)
+   * @param date - Data de referência
+   * @returns Date do último dia da semana (domingo) às 23:59:59
+   */
   private getEndOfWeek(date: Date) {
     const start = this.getStartOfWeek(date);
     const end = new Date(start);
@@ -41,6 +82,11 @@ export class AdminService {
     return end;
   }
 
+  /**
+   * Formata minutos para formato legível (HHh MMmin)
+   * @param totalMinutes - Total de minutos
+   * @returns String formatada (ex: "08h 30min")
+   */
   private formatMinutes(totalMinutes: number) {
     const safe = Math.max(0, Math.floor(totalMinutes));
     const hours = Math.floor(safe / 60);
@@ -48,10 +94,21 @@ export class AdminService {
     return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}min`;
   }
 
+  /**
+   * Calcula diferença entre duas datas em minutos
+   * @param start - Data inicial
+   * @param end - Data final
+   * @returns Diferença em minutos (mínimo 0)
+   */
   private diffInMinutes(start: Date, end: Date) {
     return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
   }
 
+  /**
+   * Mapeia tipo de ponto para formato de exibição UI
+   * @param tipo - Tipo de ponto (ENTRADA, SAIDA, etc)
+   * @returns String formatada para UI
+   */
   private mapTipo(tipo: TipoRegistro) {
     switch (tipo) {
       case 'ENTRADA':
@@ -67,6 +124,11 @@ export class AdminService {
     }
   }
 
+  /**
+   * Formata data/hora para exibição em fuso horário de São Paulo
+   * @param date - Data a formatar
+   * @returns String com horário formatado (HH:mm)
+   */
   private formatTime(date: Date) {
     return new Intl.DateTimeFormat('pt-BR', {
       hour: '2-digit',
