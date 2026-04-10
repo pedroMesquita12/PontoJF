@@ -1,18 +1,22 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
   Post,
   Query,
-  UploadedFile,
-  Body,
-  UseInterceptors,
   Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { RelatoriosService } from './relatorios.service';
 import { Response } from 'express';
+import { RelatoriosService } from './relatorios.service';
+import { MatriculaGuard } from '../common/guards/matricula.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard, MatriculaGuard)
 @Controller('admin/relatorios')
 export class RelatoriosController {
   constructor(private readonly relatoriosService: RelatoriosService) {}
@@ -76,30 +80,31 @@ export class RelatoriosController {
   async deletarEntregasSelecionadas(@Body('ids') ids: string[]) {
     return this.relatoriosService.deletarEntregasSelecionadas(ids);
   }
+
   @Post('entregas/exportar')
-async exportarEntregas(
-  @Body()
-  body: {
-    ids?: string[];
-    cidade?: string;
-    status?: string;
-    dataInicio?: string;
-    dataFim?: string;
-    busca?: string;
-  },
-  @Res() res: Response,
-) {
-  const arquivo = await this.relatoriosService.exportarEntregasParaExcel(body);
+  async exportarEntregas(
+    @Body()
+    body: {
+      ids?: string[];
+      cidade?: string;
+      status?: string;
+      dataInicio?: string;
+      dataFim?: string;
+      busca?: string;
+    },
+    @Res() res: Response,
+  ) {
+    const arquivo = await this.relatoriosService.exportarEntregasParaExcel(body);
 
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  );
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${arquivo.nomeArquivo}"`,
-  );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${arquivo.nomeArquivo}"`,
+    );
 
-  res.send(arquivo.buffer);
-}
+    res.send(arquivo.buffer);
+  }
 }

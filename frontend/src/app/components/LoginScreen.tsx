@@ -16,13 +16,15 @@ type UserData = {
   cargo: string;
   perfil: string;
   isAdmin: boolean;
+  token?: string;
+  accessToken?: string;
 };
 
 type LoginScreenProps = {
   onLogin: (user: UserData) => void;
 };
 
-const API_URL = "/api";
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
 function isAdminUser(perfil?: string, cargo?: string) {
   const perfisAdmin = ["ADMIN", "SUPERADMIN", "GERENTE"];
@@ -82,9 +84,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         cargo,
         perfil,
         isAdmin: isAdminUser(perfil, cargo),
+        token: data.accessToken,
+        accessToken: data.accessToken,
       };
 
       localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("token", data.accessToken);
 
       toast.success(`Bem-vindo(a), ${user.nome}!`);
       onLogin(user);

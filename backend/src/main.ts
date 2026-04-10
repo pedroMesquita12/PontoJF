@@ -6,8 +6,26 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: true, // libera qualquer origem (ideal para dev)
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin) return callback(null, true);
+
+      const allowed =
+        origin.includes('.github.dev') ||
+        origin.includes('.app.github.dev') ||
+        origin.includes('localhost');
+
+      if (allowed) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   await app.listen(3000);

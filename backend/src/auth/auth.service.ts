@@ -1,10 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   async login(matricula: string, senha: string) {
     try {
@@ -44,16 +48,30 @@ export class AuthService {
         data: { ultimo_login: new Date() },
       });
 
+      const user = {
+        id: Number(funcionario.id),
+        usuarioId: Number(funcionario.usuarios.id),
+        nome: funcionario.usuarios.nome,
+        email: funcionario.usuarios.email,
+        matricula: funcionario.matricula,
+        cargo: funcionario.cargos?.nome ?? 'Funcionário',
+        perfil: funcionario.usuarios.perfil,
+      };
+
+      const payload = {
+        sub: Number(funcionario.id),
+        usuarioId: Number(funcionario.usuarios.id),
+        nome: funcionario.usuarios.nome,
+        email: funcionario.usuarios.email,
+        matricula: funcionario.matricula,
+        perfil: funcionario.usuarios.perfil,
+      };
+
+      const accessToken = this.jwtService.sign(payload);
+
       return {
-        user: {
-          id: Number(funcionario.id),
-          usuarioId: Number(funcionario.usuarios.id),
-          nome: funcionario.usuarios.nome,
-          email: funcionario.usuarios.email,
-          matricula: funcionario.matricula,
-          cargo: funcionario.cargos?.nome ?? 'Funcionário',
-          perfil: funcionario.usuarios.perfil,
-        },
+        accessToken,
+        user,
       };
     } catch (error) {
       console.error('ERRO NO AUTH SERVICE:', error);

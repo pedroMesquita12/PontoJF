@@ -15,8 +15,6 @@ import { RelatoriosModule } from './relatorios/relatorios.module';
     RelatoriosModule,
     AuthModule,
     WhatsappModule,
-    PontoModule,
-    AuthModule,
     AdminModule,
   ],
 })
