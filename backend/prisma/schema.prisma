@@ -55,6 +55,8 @@ model cargos {
 
 model funcionarios {
   id                   BigInt                 @id @default(autoincrement())
+  empresa_id           BigInt?
+  unidade_id           BigInt?
   usuario_id           BigInt                 @unique
   matricula            String                 @unique @db.VarChar(30)
   cpf                  String                 @unique @db.VarChar(14)
@@ -75,6 +77,10 @@ model funcionarios {
   observacoes          String?
   created_at           DateTime               @default(now()) @db.Timestamp(6)
   updated_at           DateTime               @default(now()) @db.Timestamp(6)
+
+  empresas             empresas?              @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades             unidades?              @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+
   ajustes_ponto        ajustes_ponto[]
   cargos               cargos?                @relation(fields: [cargo_id], references: [id], onUpdate: NoAction, map: "fk_funcionario_cargo")
   setores              setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction, map: "fk_funcionario_setor")
@@ -88,6 +94,8 @@ model funcionarios {
   @@index([cpf], map: "idx_funcionarios_cpf")
   @@index([matricula], map: "idx_funcionarios_matricula")
   @@index([setor_id], map: "idx_funcionarios_setor")
+  @@index([empresa_id], map: "idx_funcionarios_empresa")
+  @@index([unidade_id], map: "idx_funcionarios_unidade")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -129,6 +137,8 @@ model justificativas_ponto {
 model registros_ponto {
   id                  BigInt              @id @default(autoincrement())
   funcionario_id      BigInt
+  empresa_id          BigInt?
+  unidade_id          BigInt?
   tipo                tipo_registro_ponto
   data_hora           DateTime            @default(now()) @db.Timestamp(6)
   data_referencia     DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
@@ -142,6 +152,9 @@ model registros_ponto {
   origem              String?             @default("WEB") @db.VarChar(30)
   created_at          DateTime            @default(now()) @db.Timestamp(6)
   updated_at          DateTime            @default(now()) @db.Timestamp(6)
+
+  empresas            empresas?           @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades            unidades?           @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
   ajustes_ponto       ajustes_ponto[]
   funcionarios        funcionarios        @relation(fields: [funcionario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registro_funcionario")
 
@@ -149,10 +162,14 @@ model registros_ponto {
   @@index([data_referencia], map: "idx_registros_ponto_data_referencia")
   @@index([funcionario_id], map: "idx_registros_ponto_funcionario")
   @@index([funcionario_id, data_referencia], map: "idx_registros_ponto_funcionario_data")
+  @@index([empresa_id], map: "idx_registros_ponto_empresa")
+  @@index([unidade_id], map: "idx_registros_ponto_unidade")
 }
 
 model importacoes_relatorios {
   id                    BigInt                @id @default(autoincrement())
+  empresa_id            BigInt?
+  unidade_id            BigInt?
   nome_arquivo          String                @db.VarChar(255)
   tipo_relatorio        tipo_relatorio
   data_importacao       DateTime              @default(now()) @db.Timestamp(6)
@@ -161,6 +178,8 @@ model importacoes_relatorios {
   created_at            DateTime              @default(now()) @db.Timestamp(6)
   updated_at            DateTime              @default(now()) @db.Timestamp(6)
 
+  empresas              empresas?             @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades              unidades?             @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
   usuarios              usuarios?             @relation(fields: [importado_por], references: [id], onUpdate: NoAction, map: "fk_importacao_usuario")
   relatorios_entregas   relatorios_entregas[]
   relatorios_orcamentos relatorios_orcamentos[]
@@ -168,15 +187,62 @@ model importacoes_relatorios {
   @@index([tipo_relatorio], map: "idx_importacoes_tipo_relatorio")
   @@index([data_importacao], map: "idx_importacoes_data_importacao")
   @@index([importado_por], map: "idx_importacoes_importado_por")
+  @@index([empresa_id], map: "idx_importacoes_empresa")
+  @@index([unidade_id], map: "idx_importacoes_unidade")
+}
+model empresas {
+  id                     BigInt                  @id @default(autoincrement())
+  nome                   String                  @db.VarChar(150)
+  cnpj                   String?                 @unique @db.VarChar(18)
+  ativo                  Boolean                 @default(true)
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
+
+  unidades               unidades[]
+  usuarios               usuarios[]
+  funcionarios           funcionarios[]
+  importacoes_relatorios importacoes_relatorios[]
+  relatorios_entregas    relatorios_entregas[]
+  relatorios_orcamentos  relatorios_orcamentos[]
+  registros_ponto        registros_ponto[]
+
+  @@index([nome], map: "idx_empresas_nome")
+}
+
+model unidades {
+  id                     BigInt                  @id @default(autoincrement())
+  empresa_id             BigInt
+  nome                   String                  @db.VarChar(150)
+  endereco               String?                 @db.VarChar(255)
+  cidade                 String?                 @db.VarChar(100)
+  estado                 String?                 @db.VarChar(2)
+  cep                    String?                 @db.VarChar(9)
+  ativo                  Boolean                 @default(true)
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
+
+  empresas               empresas                @relation(fields: [empresa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios               usuarios[]
+  funcionarios           funcionarios[]
+  importacoes_relatorios importacoes_relatorios[]
+  relatorios_entregas    relatorios_entregas[]
+  relatorios_orcamentos  relatorios_orcamentos[]
+  registros_ponto        registros_ponto[]
+
+  @@index([empresa_id], map: "idx_unidades_empresa")
+  @@index([nome], map: "idx_unidades_nome")
+  @@unique([empresa_id, nome], map: "uq_unidade_empresa_nome")
 }
 
 model relatorios_entregas {
   id                     BigInt                   @id @default(autoincrement())
   importacao_id          BigInt
+  empresa_id             BigInt?
+  unidade_id             BigInt?
   codigo_entrega         String?                  @db.VarChar(50)
   endereco               String?                  @db.VarChar(255)
   cidade                 String?                  @db.VarChar(100)
-  data_entrega           DateTime?                @db.Timestamp(3)          
+  data_entrega           DateTime?                @db.Timestamp(3)
   status                 status_entrega_relatorio?
   valor_entrega          Decimal?                 @db.Decimal(10, 2)
   entregador_nome        String?                  @db.VarChar(150)
@@ -185,6 +251,8 @@ model relatorios_entregas {
   created_at             DateTime                 @default(now()) @db.Timestamp(6)
   updated_at             DateTime                 @default(now()) @db.Timestamp(6)
 
+  empresas               empresas?                @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades               unidades?                @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
   importacoes_relatorios importacoes_relatorios   @relation(fields: [importacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_relatorio_entrega_importacao")
 
   @@index([cidade], map: "idx_relatorios_entregas_cidade")
@@ -192,30 +260,38 @@ model relatorios_entregas {
   @@index([data_entrega], map: "idx_relatorios_entregas_data_entrega")
   @@index([importacao_id], map: "idx_relatorios_entregas_importacao")
   @@index([codigo_entrega], map: "idx_relatorios_entregas_codigo")
+  @@index([empresa_id], map: "idx_relatorios_entregas_empresa")
+  @@index([unidade_id], map: "idx_relatorios_entregas_unidade")
 }
 
 model relatorios_orcamentos {
-  id                    BigInt                  @id @default(autoincrement())
-  importacao_id         BigInt
-  codigo_orcamento      String?                 @db.VarChar(50)
-  cliente               String?                 @db.VarChar(150)
-  cidade                String?                 @db.VarChar(100)
-  estado                String?                 @db.VarChar(2)
-  data_orcamento        DateTime?               @db.Date
-  status                status_orcamento_relatorio?
-  valor                 Decimal?                @db.Decimal(10, 2)
-  observacoes           String?
-  origem_arquivo        String?                 @db.VarChar(255)
-  created_at            DateTime                @default(now()) @db.Timestamp(6)
-  updated_at            DateTime                @default(now()) @db.Timestamp(6)
+  id                     BigInt                  @id @default(autoincrement())
+  importacao_id          BigInt
+  empresa_id             BigInt?
+  unidade_id             BigInt?
+  codigo_orcamento       String?                 @db.VarChar(50)
+  cliente                String?                 @db.VarChar(150)
+  cidade                 String?                 @db.VarChar(100)
+  estado                 String?                 @db.VarChar(2)
+  data_orcamento         DateTime?               @db.Date
+  status                 status_orcamento_relatorio?
+  valor                  Decimal?                @db.Decimal(10, 2)
+  observacoes            String?
+  origem_arquivo         String?                 @db.VarChar(255)
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
 
-  importacoes_relatorios importacoes_relatorios @relation(fields: [importacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_relatorio_orcamento_importacao")
+  empresas               empresas?               @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades               unidades?               @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  importacoes_relatorios importacoes_relatorios  @relation(fields: [importacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_relatorio_orcamento_importacao")
 
   @@index([cidade], map: "idx_relatorios_orcamentos_cidade")
   @@index([status], map: "idx_relatorios_orcamentos_status")
   @@index([data_orcamento], map: "idx_relatorios_orcamentos_data_orcamento")
   @@index([importacao_id], map: "idx_relatorios_orcamentos_importacao")
   @@index([codigo_orcamento], map: "idx_relatorios_orcamentos_codigo")
+  @@index([empresa_id], map: "idx_relatorios_orcamentos_empresa")
+  @@index([unidade_id], map: "idx_relatorios_orcamentos_unidade")
 }
 
 model setores {
@@ -229,6 +305,8 @@ model setores {
 
 model usuarios {
   id                     BigInt                 @id @default(autoincrement())
+  empresa_id             BigInt?
+  unidade_id             BigInt?
   nome                   String                 @db.VarChar(150)
   email                  String                 @unique @db.VarChar(150)
   senha_hash             String
@@ -237,6 +315,10 @@ model usuarios {
   ativo                  Boolean                @default(true)
   created_at             DateTime               @default(now()) @db.Timestamp(6)
   updated_at             DateTime               @default(now()) @db.Timestamp(6)
+
+  empresas               empresas?              @relation(fields: [empresa_id], references: [id], onUpdate: NoAction)
+  unidades               unidades?              @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+
   ajustes_ponto          ajustes_ponto[]
   auditoria              auditoria[]
   funcionarios           funcionarios?
@@ -244,6 +326,8 @@ model usuarios {
   importacoes_relatorios importacoes_relatorios[]
 
   @@index([email], map: "idx_usuarios_email")
+  @@index([empresa_id], map: "idx_usuarios_empresa")
+  @@index([unidade_id], map: "idx_usuarios_unidade")
 }
 
 enum status_ajuste {
@@ -285,6 +369,7 @@ enum status_justificativa {
 }
 
 enum tipo_perfil {
+  DONO
   ADMIN
   GESTOR
   RH

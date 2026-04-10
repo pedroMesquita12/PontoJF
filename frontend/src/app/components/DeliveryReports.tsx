@@ -33,7 +33,6 @@ type DadosRelatorio = {
     pendentes: number;
     canceladas?: number;
   };
-
   financeiro?: {
     valorTotal: number;
     ticketMedio: number;
@@ -41,9 +40,63 @@ type DadosRelatorio = {
     menorEntrega: number;
     totalComValor: number;
   };
-
   entregas: Entrega[];
 };
+
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+
+function getToken() {
+  try {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      const user = JSON.parse(userData);
+      return user?.token || user?.accessToken || null;
+    }
+
+    return localStorage.getItem("token");
+  } catch {
+    return localStorage.getItem("token");
+  }
+}
+
+async function apiFetch(url: string, options: RequestInit = {}) {
+  const token = getToken();
+  const headers = new Headers(options.headers || {});
+  const isFormData = options.body instanceof FormData;
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  if (!isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${API_URL}${url}`, {
+    ...options,
+    headers,
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  let data: any = null;
+
+  if (contentType.includes("application/json")) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    data = text || null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message || data || `Erro ${response.status} ao acessar ${url}`
+    );
+  }
+
+  return { response, data };
+}
+
 export default function DeliveryReports() {
   const [dados, setDados] = useState<DadosRelatorio | null>(null);
   const [cidades, setCidades] = useState<string[]>([]);
@@ -63,8 +116,15 @@ export default function DeliveryReports() {
   const [arquivosSelecionados, setArquivosSelecionados] = useState<string[]>([]);
   const [entregasSelecionadas, setEntregasSelecionadas] = useState<string[]>([]);
 
-  const userData = localStorage.getItem("user");
-  const usuario = userData ? JSON.parse(userData) : null;
+  let usuario: any = null;
+
+  try {
+    const userData = localStorage.getItem("user");
+    usuario = userData ? JSON.parse(userData) : null;
+  } catch (error) {
+    console.error("Erro ao ler usuário do localStorage:", error);
+  }
+
   const usuarioId = usuario?.id || usuario?.usuarioId || 1;
 
   const entregas = useMemo(() => dados?.entregas ?? [], [dados]);
@@ -83,14 +143,8 @@ export default function DeliveryReports() {
 
   async function carregarCidades() {
     try {
-      const response = await fetch("/api/admin/relatorios/entregas/cidades");
-
-      if (!response.ok) {
-        throw new Error("Erro ao carregar cidades.");
-      }
-
-      const data = await response.json();
-      setCidades(data);
+      const { data } = await apiFetch("/admin/relatorios/entregas/cidades");
+      setCidades(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }
@@ -109,19 +163,16 @@ export default function DeliveryReports() {
       if (dataFim) params.append("dataFim", dataFim);
       if (busca) params.append("busca", busca);
 
-      const response = await fetch(
-        `/api/admin/relatorios/entregas?${params.toString()}`
-      );
+      const query = params.toString();
+      const url = query
+        ? `/admin/relatorios/entregas?${query}`
+        : "/admin/relatorios/entregas";
 
-      if (!response.ok) {
-        throw new Error("Erro ao carregar os relatórios.");
-      }
-
-      const data = await response.json();
+      const { data } = await apiFetch(url);
       setDados(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setErro("Não foi possível carregar os relatórios.");
+      setErro(err?.message || "Não foi possível carregar os relatórios.");
     } finally {
       setLoading(false);
     }
@@ -161,22 +212,16 @@ export default function DeliveryReports() {
       const formData = new FormData();
       formData.append("file", arquivo);
 
-      const response = await fetch(
-        `/api/admin/relatorios/importar/entregas?usuarioId=${usuarioId}`,
+      const { data } = await apiFetch(
+        `/admin/relatorios/importar/entregas?usuarioId=${usuarioId}`,
         {
           method: "POST",
           body: formData,
         }
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message || "Erro ao importar planilha.");
-      }
-
       setMensagem(
-        `Planilha importada com sucesso. ${data.totalImportado ?? 0} registros adicionados.`
+        `Planilha importada com sucesso. ${data?.totalImportado ?? 0} registros adicionados.`
       );
 
       setArquivo(null);
@@ -253,17 +298,16 @@ export default function DeliveryReports() {
         setErro("");
         setMensagem("");
 
-        const response = await fetch("/api/admin/relatorios/entregas", {
+        const { data } = await apiFetch("/admin/relatorios/entregas", {
           method: "DELETE",
         });
 
-        const data = await response.json();
+        setMensagem(
+          typeof data === "string"
+            ? data
+            : data?.message || "Todos os dados foram removidos com sucesso."
+        );
 
-        if (!response.ok) {
-          throw new Error(data?.message || "Erro ao apagar tudo.");
-        }
-
-        setMensagem(data?.message || "Todos os dados foram removidos com sucesso.");
         setArquivosSelecionados([]);
         setEntregasSelecionadas([]);
 
@@ -298,49 +342,21 @@ export default function DeliveryReports() {
       setMensagem("");
 
       if (totalEntregas > 0) {
-        const responseEntregas = await fetch(
-          "/api/admin/relatorios/entregas/selecionadas",
-          {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              ids: entregasSelecionadas,
-            }),
-          }
-        );
-
-        const dataEntregas = await responseEntregas.json();
-
-        if (!responseEntregas.ok) {
-          throw new Error(
-            dataEntregas?.message || "Erro ao apagar dados selecionados."
-          );
-        }
+        await apiFetch("/admin/relatorios/entregas/selecionadas", {
+          method: "DELETE",
+          body: JSON.stringify({
+            ids: entregasSelecionadas,
+          }),
+        });
       }
 
       if (totalArquivos > 0) {
-        const responseArquivos = await fetch(
-          "/api/admin/relatorios/entregas/arquivos",
-          {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              arquivos: arquivosSelecionados,
-            }),
-          }
-        );
-
-        const dataArquivos = await responseArquivos.json();
-
-        if (!responseArquivos.ok) {
-          throw new Error(
-            dataArquivos?.message || "Erro ao apagar planilhas selecionadas."
-          );
-        }
+        await apiFetch("/admin/relatorios/entregas/arquivos", {
+          method: "DELETE",
+          body: JSON.stringify({
+            arquivos: arquivosSelecionados,
+          }),
+        });
       }
 
       setMensagem("Itens selecionados removidos com sucesso.");
@@ -371,61 +387,80 @@ export default function DeliveryReports() {
         return "Sem status";
     }
   }
+
   async function exportarEntregas() {
-  try {
-    setErro("");
-    setMensagem("");
+    try {
+      setErro("");
+      setMensagem("");
 
-    const body =
-      entregasSelecionadas.length > 0
-        ? { ids: entregasSelecionadas }
-        : {
-            cidade,
-            status,
-            dataInicio,
-            dataFim,
-            busca,
-          };
+      const token = getToken();
 
-    const response = await fetch("/api/admin/relatorios/entregas/exportar", {
-      method: "POST",
-      headers: {
+      const body =
+        entregasSelecionadas.length > 0
+          ? { ids: entregasSelecionadas }
+          : {
+              cidade,
+              status,
+              dataInicio,
+              dataFim,
+              busca,
+            };
+
+      const headers: Record<string, string> = {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+      };
 
-    if (!response.ok) {
-      const erroData = await response.json();
-      throw new Error(erroData?.message || "Erro ao exportar relatório.");
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(
+        `${API_URL}/admin/relatorios/entregas/exportar`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          const erroData = await response.json();
+          throw new Error(erroData?.message || "Erro ao exportar relatório.");
+        }
+
+        const erroTexto = await response.text();
+        throw new Error(erroTexto || "Erro ao exportar relatório.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        entregasSelecionadas.length > 0
+          ? "entregas-selecionadas.xlsx"
+          : "relatorio-entregas.xlsx";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      setMensagem(
+        entregasSelecionadas.length > 0
+          ? "Registros selecionados exportados com sucesso."
+          : "Relatório exportado com sucesso."
+      );
+    } catch (err: any) {
+      console.error(err);
+      setErro(err?.message || "Não foi possível exportar os dados.");
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download =
-      entregasSelecionadas.length > 0
-        ? "entregas-selecionadas.xlsx"
-        : "relatorio-entregas.xlsx";
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-
-    setMensagem(
-      entregasSelecionadas.length > 0
-        ? "Registros selecionados exportados com sucesso."
-        : "Relatório exportado com sucesso."
-    );
-  } catch (err: any) {
-    console.error(err);
-    setErro(err?.message || "Não foi possível exportar os dados.");
   }
-}
 
   function getStatusClasses(status: EntregaStatus) {
     switch (status) {
@@ -452,29 +487,29 @@ export default function DeliveryReports() {
   }
 
   function formatarHorario(data?: string | null) {
-  if (!data) return "-";
+    if (!data) return "-";
 
-  const date = new Date(data);
-  if (Number.isNaN(date.getTime())) return "-";
+    const date = new Date(data);
+    if (Number.isNaN(date.getTime())) return "-";
 
-  const iso = typeof data === "string" ? data : "";
+    const iso = typeof data === "string" ? data : "";
 
-  const ehDataSemHoraReal =
-    iso.includes("T00:00:00") ||
-    iso.includes("T00:00:00.000Z") ||
-    (date.getUTCHours() === 0 &&
-      date.getUTCMinutes() === 0 &&
-      date.getUTCSeconds() === 0);
+    const ehDataSemHoraReal =
+      iso.includes("T00:00:00") ||
+      iso.includes("T00:00:00.000Z") ||
+      (date.getUTCHours() === 0 &&
+        date.getUTCMinutes() === 0 &&
+        date.getUTCSeconds() === 0);
 
-  if (ehDataSemHoraReal) {
-    return "-";
+    if (ehDataSemHoraReal) {
+      return "-";
+    }
+
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
-
-  return date.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
   function formatarValor(valor?: string | number | null) {
     if (valor === null || valor === undefined || valor === "") return "-";
@@ -533,14 +568,14 @@ export default function DeliveryReports() {
           </button>
 
           <button
-  onClick={exportarEntregas}
-  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50"
->
-  <Download size={16} />
-  {entregasSelecionadas.length > 0
-    ? `Exportar selecionados (${entregasSelecionadas.length})`
-    : "Exportar Relatório"}
-</button>
+            onClick={exportarEntregas}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50"
+          >
+            <Download size={16} />
+            {entregasSelecionadas.length > 0
+              ? `Exportar selecionados (${entregasSelecionadas.length})`
+              : "Exportar Relatório"}
+          </button>
 
           <button
             onClick={handleApagar}
@@ -616,39 +651,41 @@ export default function DeliveryReports() {
           {erro}
         </div>
       )}
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-    <p className="text-sm text-[#646680]">Valor Total</p>
-    <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
-      {formatarValor(dados?.financeiro?.valorTotal ?? 0)}
-    </h3>
-    <p className="mt-2 text-sm text-[#8c8da9]">Faturamento total</p>
-  </div>
 
-  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-    <p className="text-sm text-[#646680]">Ticket Médio</p>
-    <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
-      {formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
-    </h3>
-    <p className="mt-2 text-sm text-[#8c8da9]">Média por entrega</p>
-  </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Valor Total</p>
+          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+            {formatarValor(dados?.financeiro?.valorTotal ?? 0)}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Faturamento total</p>
+        </div>
 
-  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-    <p className="text-sm text-[#646680]">Maior Entrega</p>
-    <h3 className="mt-4 text-4xl font-bold text-green-600">
-      {formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
-    </h3>
-    <p className="mt-2 text-sm text-[#8c8da9]">Maior valor</p>
-  </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Ticket Médio</p>
+          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+            {formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Média por entrega</p>
+        </div>
 
-  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-    <p className="text-sm text-[#646680]">Menor Entrega</p>
-    <h3 className="mt-4 text-4xl font-bold text-blue-600">
-      {formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
-    </h3>
-    <p className="mt-2 text-sm text-[#8c8da9]">Menor valor</p>
-  </div>
-</div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Maior Entrega</p>
+          <h3 className="mt-4 text-4xl font-bold text-green-600">
+            {formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Maior valor</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-[#646680]">Menor Entrega</p>
+          <h3 className="mt-4 text-4xl font-bold text-blue-600">
+            {formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
+          </h3>
+          <p className="mt-2 text-sm text-[#8c8da9]">Menor valor</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-[#646680]">Total de Entregas</p>

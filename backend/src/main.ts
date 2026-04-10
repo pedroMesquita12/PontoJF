@@ -2,26 +2,32 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import 'dotenv/config';
 
-/**
- * Função bootstrap responsável pela inicialização da aplicação NestJS.
- * Esta é a função principal que:
- *  Cria a instância da aplicação NestJS
- *  Configura CORS para aceitar requisições de qualquer origem
- *  Inicia o servidor na porta 3000
- */
 async function bootstrap() {
-  // Cria a aplicação NestJS com o AppModule como módulo raiz
   const app = await NestFactory.create(AppModule);
 
-  // Habilita CORS para permitir requisições de diferentes origens (configuração de desenvolvimento)
   app.enableCors({
-    origin: true, // Aceita qualquer origem (ideal para desenvolvimento)
-    credentials: true, // Permite envio de credenciais (cookies, headers de autenticação)
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin) return callback(null, true);
+
+      const allowed =
+        origin.includes('.github.dev') ||
+        origin.includes('.app.github.dev') ||
+        origin.includes('localhost');
+
+      if (allowed) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Inicia o servidor na porta 3000
   await app.listen(3000);
 }
-
-// Executa a função de bootstrap para iniciar a aplicação
 bootstrap();
