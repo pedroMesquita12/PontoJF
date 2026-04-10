@@ -116,19 +116,20 @@ export function TimeClockApp({
   // Data atual
   const [dataAtual, setDataAtual] = useState(new Date());
 
+    // detecta virada de dia
+    useEffect(() => {
+  const timer = setInterval(() => {
+    const agora = new Date();
+
     setCurrentTime(agora);
 
-    // detecta virada de dia
     if (
       agora.getDate() !== dataAtual.getDate() ||
       agora.getMonth() !== dataAtual.getMonth() ||
       agora.getFullYear() !== dataAtual.getFullYear()
     ) {
       console.log("🔄 Virou o dia!");
-
       setDataAtual(agora);
-
-      // recarrega registros do novo dia
       carregarPontos();
     }
   }, 1000);
