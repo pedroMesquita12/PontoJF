@@ -26,17 +26,8 @@ type LoginScreenProps = {
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
-function isAdminUser(perfil?: string, cargo?: string) {
-  const perfisAdmin = ["ADMIN", "SUPERADMIN", "GERENTE"];
-  const cargosAdmin = ["GERENTE", "SUPERVISOR", "COORDENADOR", "DIRETOR"];
-
-  const perfilNormalizado = (perfil || "").toUpperCase().trim();
-  const cargoNormalizado = (cargo || "").toUpperCase().trim();
-
-  return (
-    perfisAdmin.includes(perfilNormalizado) ||
-    cargosAdmin.includes(cargoNormalizado)
-  );
+function isAdminUser(perfil?: string) {
+  return (perfil || "").toUpperCase().trim() === "DONO";
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
@@ -83,7 +74,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         email: data.user.email,
         cargo,
         perfil,
-        isAdmin: isAdminUser(perfil, cargo),
+        isAdmin: isAdminUser(perfil),
         token: data.accessToken,
         accessToken: data.accessToken,
       };

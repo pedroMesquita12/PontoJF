@@ -405,10 +405,9 @@ async obterOverview(data: string) {
 
   const totalFuncionarios = funcionarios.length;
   const comRegistroHoje = new Set(registrosDia.map((r) => String(r.funcionario_id))).size;
-  const taxaPresenca =
-    totalFuncionarios > 0 ? Number(((comRegistroHoje / totalFuncionarios) * 100).toFixed(1)) : 0;
-
-  const weeklyData = [];
+  const taxaPresenca = totalFuncionarios > 0 ? Number(((comRegistroHoje / totalFuncionarios) * 100).toFixed(1)) : 0;
+  
+  const weeklyData: { dia: string; funcionarios: number; horas: number }[] = [];
   for (let i = 0; i < 6; i++) {
     const dia = new Date(inicioSemana);
     dia.setDate(inicioSemana.getDate() + i);

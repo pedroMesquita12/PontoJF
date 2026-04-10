@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
     "target": "ES2021",
+    "lib": ["ES2021"],
+
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
 
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
@@ -9,11 +12,20 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    "rootDir": "./src",
 
     "incremental": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "removeComments": false,
+
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
 }
