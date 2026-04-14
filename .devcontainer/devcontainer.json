@@ -1,0 +1,55 @@
+{
+  "name": "PontoJF Dev",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [3000, 5173, 5555],
+  "portsAttributes": {
+    "3000": {
+      "label": "Backend NestJS",
+      "onAutoForward": "openPreview",
+      "visibility": "public"
+    },
+    "5173": {
+      "label": "Frontend Vite",
+      "onAutoForward": "openPreview",
+      "visibility": "public"
+    },
+    "5555": {
+      "label": "Prisma Studio",
+      "onAutoForward": "silent",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "files.eol": "\n",
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "Prisma.prisma",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-typescript-next",
+        "eamodio.gitlens",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "usernamehw.errorlens"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}

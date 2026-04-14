@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -19,14 +25,29 @@ import { TimeClockApp } from "./TimeClockApp";
 import DeliveryReports from "./DeliveryReports";
 import { PackageEntry } from "./PackageEntry";
 import { DashboardOverview } from "./DashboardOverview";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
 
 /**
  * Dados do usuário que são exibidos no dashboard
  */
 type UserData = {
-  matricula: string;  // Matrícula do funcionário
-  nome: string;       // Nome completo
-  cargo: string;      // Cargo/função
+  id: number;
+  usuarioId: number;
+  matricula: string;
+  nome: string;
+  email: string;
+  cargo: string;
+  perfil: string;
 };
 
 /**
@@ -39,7 +60,7 @@ type DashboardProps = {
 
 /**
  * Componente Dashboard (Principal)
- * 
+ *
  * Responsabilidades:
  * - Exibir interface principal após login
  * - Gerenciar abas de navegação
@@ -50,7 +71,7 @@ type DashboardProps = {
  *   4. Registros: Pacotes/registros
  * - Exibir informações do usuário
  * - Permitir logout
- * 
+ *
  * Layout:
  * - Header: Logo, nome do usuário, botão logout
  * - Abas: Navegação entre seções
@@ -72,7 +93,9 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
                 <Package className="size-6" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-900">Express Encomendas</h1>
+                <h1 className="text-lg font-bold text-slate-900">
+                  LogiControl
+                </h1>
                 <p className="text-xs text-slate-600">Sistema de Gestão</p>
               </div>
             </div>
@@ -81,19 +104,43 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
             <div className="flex items-center gap-4">
               {/* Nome, cargo e matrícula (oculto em mobile) */}
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-slate-900">{userData.nome}</p>
-                <p className="text-xs text-slate-600">{userData.cargo} - Mat. {userData.matricula}</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {userData.nome}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {userData.cargo} - Mat. {userData.matricula}
+                </p>
               </div>
               {/* Botão de logout */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLogout}
-                className="gap-2"
-              >
-                <LogOut className="size-4" />
-                <span className="hidden sm:inline">Sair</span>
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <LogOut className="size-4" />
+                    <span className="hidden sm:inline">Sair</span>
+                  </Button>
+                </AlertDialogTrigger>
+
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Deseja sair do sistema?</AlertDialogTitle>
+
+                    <AlertDialogDescription>
+                      Você será desconectado e precisará fazer login novamente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={onLogout}
+                    >
+                      Confirmar saída
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         </div>
@@ -101,7 +148,11 @@ export function Dashboard({ userData, onLogout }: DashboardProps) {
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           {/* Abas de navegação */}
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid h-auto p-1">
             {/* Aba: Overview */}

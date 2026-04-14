@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -30,32 +30,26 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
-/**
- * Tipo para entrada de ponto (entrada/saída/pausa)
- */
 type TimeEntry = {
-  id: string;              // ID do registro
-  type: "entrada" | "saida" | "pausa_inicio" | "pausa_fim"; // Tipo normalizado para UI
-  timestamp: Date;         // Data/hora formatada
+  id: string;
+  type: "entrada" | "saida" | "pausa_inicio" | "pausa_fim";
+  timestamp: Date;
 };
 
-/**
- * Tipo para resposta da API (dados brutos)
- */
 type ApiTimeEntry = {
   id: number | string;
-  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO"; // Tipo retornado da API
+  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO";
   data_hora: string;
 };
 
-/**
- * Status do funcionário em tempo real
- */
 type WorkStatus = "fora" | "trabalhando" | "pausa";
 
-/**
- * Dados do usuário autenticado
- */
+type DaySummary = {
+  workedSeconds: number;
+  pauseSeconds: number;
+  statusAtual: WorkStatus;
+};
+
 type UserData = {
   id: number;
   usuarioId: number;
@@ -66,88 +60,47 @@ type UserData = {
   perfil: string;
 };
 
-/**
- * Props do componente TimeClockApp
- */
 type TimeClockAppProps = {
-  userData: UserData;     // Dados do usuário logado
-  onLogout: () => void;   // Callback para logout
-  hideHeader?: boolean;   // Flag para esconder header (uso em dashboard embarcado)
+  userData: UserData;
+  onLogout: () => void;
+  hideHeader?: boolean;
 };
 
-/**
- * Componente de Relógio de Ponto (TimeClockApp)
- * 
- * Responsabilidades:
- * - Exibir relógio em tempo real
- * - Registrar entrada/saída do funcionário
- * - Solicitar localização por GPS
- * - Calcular tempo trabalhado e pausa
- * - Listar histórico de pontos do dia
- * - Mostrar status atual do funcionário
- * 
- * Fluxo de funcionamento:
- * 1. Carrega pontos do funcionário
- * 2. Atualiza hora a cada segundo
- * 3. Calcula status e tempos
- * 4. Permite registrar novo ponto com GPS
- * 5. Atualiza lista de pontos
- */
 export function TimeClockApp({
   userData,
   onLogout,
   hideHeader = false,
 }: TimeClockAppProps) {
-  // Estado: Hora atual para relógio
   const [currentTime, setCurrentTime] = useState(new Date());
-  // Estado: Status atual do funcionário (fora, trabalhando, pausa)
-  const [workStatus, setWorkStatus] = useState<WorkStatus>("fora");
-  // Estado: Lista de pontos registrados
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
-  // Estado: Tempo trabalhado em minutos
-  const [workedTime, setWorkedTime] = useState(0);
-  // Estado: Tempo de pausa em minutos
-  const [pauseTime, setPauseTime] = useState(0);
+  const [isLoadingEntries, setIsLoadingEntries] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ID do funcionário
   const funcionarioId = userData.id;
-  // Entregas do dia (valor mockado)
   const deliveriesToday = 12;
-  // Data atual
   const [dataAtual, setDataAtual] = useState(new Date());
 
-    // detecta virada de dia
-    useEffect(() => {
-  const timer = setInterval(() => {
-    const agora = new Date();
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const agora = new Date();
+      setCurrentTime(agora);
 
-    setCurrentTime(agora);
+      const virouODia =
+        agora.getDate() !== dataAtual.getDate() ||
+        agora.getMonth() !== dataAtual.getMonth() ||
+        agora.getFullYear() !== dataAtual.getFullYear();
 
-    if (
-      agora.getDate() !== dataAtual.getDate() ||
-      agora.getMonth() !== dataAtual.getMonth() ||
-      agora.getFullYear() !== dataAtual.getFullYear()
-    ) {
-      console.log("🔄 Virou o dia!");
-      setDataAtual(agora);
-      carregarPontos();
-    }
-  }, 1000);
+      if (virouODia) {
+        setDataAtual(agora);
+        void carregarPontos();
+      }
+    }, 1000);
 
-  return () => clearInterval(timer);
-}, [dataAtual]);
+    return () => clearInterval(timer);
+  }, [dataAtual]);
 
   useEffect(() => {
-  const resumo = recalcularResumoDoDia(timeEntries, currentTime);
-
-  setWorkedTime(resumo.workedSeconds);
-  setPauseTime(resumo.pauseSeconds);
-  setWorkStatus(resumo.statusAtual);
-}, [timeEntries, currentTime]);
-
-
-  useEffect(() => {
-    carregarPontos();
+    void carregarPontos();
   }, []);
 
   const formatTime = (date: Date) => {
@@ -177,91 +130,93 @@ export function TimeClockApp({
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const isMesmoDia = (data: Date, referencia: Date) => {
-  return (
-    data.getDate() === referencia.getDate() &&
-    data.getMonth() === referencia.getMonth() &&
-    data.getFullYear() === referencia.getFullYear()
-  );
-};
-
-const recalcularResumoDoDia = (entries: TimeEntry[], agora: Date) => {
-  const registrosHoje = [...entries]
-    .filter((entry) => isMesmoDia(entry.timestamp, agora))
-    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-  let segundosTrabalhados = 0;
-  let segundosPausa = 0;
-
-  let inicioTrabalho: Date | null = null;
-  let inicioPausa: Date | null = null;
-  let statusAtual: WorkStatus = "fora";
-
-  for (const entry of registrosHoje) {
-    if (entry.type === "entrada") {
-      inicioTrabalho = entry.timestamp;
-      inicioPausa = null;
-      statusAtual = "trabalhando";
-    }
-
-    if (entry.type === "pausa_inicio") {
-      if (inicioTrabalho) {
-        segundosTrabalhados += Math.floor(
-          (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000
-        );
-      }
-
-      inicioTrabalho = null;
-      inicioPausa = entry.timestamp;
-      statusAtual = "pausa";
-    }
-
-    if (entry.type === "pausa_fim") {
-      if (inicioPausa) {
-        segundosPausa += Math.floor(
-          (entry.timestamp.getTime() - inicioPausa.getTime()) / 1000
-        );
-      }
-
-      inicioPausa = null;
-      inicioTrabalho = entry.timestamp;
-      statusAtual = "trabalhando";
-    }
-
-    if (entry.type === "saida") {
-      if (inicioTrabalho) {
-        segundosTrabalhados += Math.floor(
-          (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000
-        );
-      }
-
-      inicioTrabalho = null;
-      inicioPausa = null;
-      statusAtual = "fora";
-    }
-  }
-
-  if (statusAtual === "trabalhando" && inicioTrabalho) {
-    segundosTrabalhados += Math.floor(
-      (agora.getTime() - inicioTrabalho.getTime()) / 1000
+  const recalcularResumoDoDia = (
+    entries: TimeEntry[],
+    agora: Date,
+  ): DaySummary => {
+    const registrosOrdenados = [...entries].sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
     );
-  }
 
-  if (statusAtual === "pausa" && inicioPausa) {
-    segundosPausa += Math.floor(
-      (agora.getTime() - inicioPausa.getTime()) / 1000
-    );
-  }
+    let segundosTrabalhados = 0;
+    let segundosPausa = 0;
 
-  return {
-    workedSeconds: Math.max(0, segundosTrabalhados),
-    pauseSeconds: Math.max(0, segundosPausa),
-    statusAtual,
+    let inicioTrabalho: Date | null = null;
+    let inicioPausa: Date | null = null;
+    let statusAtual: WorkStatus = "fora";
+
+    for (const entry of registrosOrdenados) {
+      if (entry.type === "entrada") {
+        inicioTrabalho = entry.timestamp;
+        inicioPausa = null;
+        statusAtual = "trabalhando";
+      }
+
+      if (entry.type === "pausa_inicio") {
+        if (inicioTrabalho) {
+          segundosTrabalhados += Math.floor(
+            (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000,
+          );
+        }
+
+        inicioTrabalho = null;
+        inicioPausa = entry.timestamp;
+        statusAtual = "pausa";
+      }
+
+      if (entry.type === "pausa_fim") {
+        if (inicioPausa) {
+          segundosPausa += Math.floor(
+            (entry.timestamp.getTime() - inicioPausa.getTime()) / 1000,
+          );
+        }
+
+        inicioPausa = null;
+        inicioTrabalho = entry.timestamp;
+        statusAtual = "trabalhando";
+      }
+
+      if (entry.type === "saida") {
+        if (inicioTrabalho) {
+          segundosTrabalhados += Math.floor(
+            (entry.timestamp.getTime() - inicioTrabalho.getTime()) / 1000,
+          );
+        }
+
+        inicioTrabalho = null;
+        inicioPausa = null;
+        statusAtual = "fora";
+      }
+    }
+
+    if (statusAtual === "trabalhando" && inicioTrabalho) {
+      segundosTrabalhados += Math.floor(
+        (agora.getTime() - inicioTrabalho.getTime()) / 1000,
+      );
+    }
+
+    if (statusAtual === "pausa" && inicioPausa) {
+      segundosPausa += Math.floor(
+        (agora.getTime() - inicioPausa.getTime()) / 1000,
+      );
+    }
+
+    return {
+      workedSeconds: Math.max(0, segundosTrabalhados),
+      pauseSeconds: Math.max(0, segundosPausa),
+      statusAtual,
+    };
   };
-};
 
-  const mapApiEntriesToUi = (entries: ApiTimeEntry[]): TimeEntry[] => {
-  return entries.map((entry) => {
+  const resumo = useMemo<DaySummary>(() => {
+    return recalcularResumoDoDia(timeEntries, currentTime);
+  }, [timeEntries, currentTime]);
+
+  const workedTime = resumo.workedSeconds;
+  const pauseTime = resumo.pauseSeconds;
+  const workStatus: WorkStatus = resumo.statusAtual;
+
+  const mapApiEntryToUi = (entry: ApiTimeEntry): TimeEntry => {
     let type: TimeEntry["type"] = "entrada";
 
     if (entry.tipo === "ENTRADA") type = "entrada";
@@ -274,245 +229,273 @@ const recalcularResumoDoDia = (entries: TimeEntry[], agora: Date) => {
       type,
       timestamp: new Date(entry.data_hora),
     };
-  });
-};
+  };
 
-const carregarPontos = async () => {
-  try {
-    const response = await fetch(`/api/ponto/${funcionarioId}`);
-    const data = await response.json();
+  const mapApiEntriesToUi = (entries: ApiTimeEntry[]): TimeEntry[] => {
+    return entries.map(mapApiEntryToUi);
+  };
 
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao buscar registros");
+  const carregarPontos = async () => {
+    try {
+      setIsLoadingEntries(true);
+
+      const response = await fetch(`/api/ponto/${funcionarioId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao buscar registros");
+      }
+
+      const registros = mapApiEntriesToUi(data);
+      setTimeEntries(registros);
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao carregar registros");
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  };
+
+  const obterLocalizacaoPrecisa = (): Promise<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  }> => {
+    if (!navigator.geolocation) {
+      return Promise.reject(
+        new Error("Geolocalização não suportada neste navegador"),
+      );
     }
 
-    const registros = mapApiEntriesToUi(data);
-    setTimeEntries(registros);
+    return new Promise((resolve, reject) => {
+      const leituras: Array<{
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+      }> = [];
 
-    const resumo = recalcularResumoDoDia(registros, new Date());
-    setWorkedTime(resumo.workedSeconds);
-    setPauseTime(resumo.pauseSeconds);
-    setWorkStatus(resumo.statusAtual);
-  } catch (error) {
-    console.error(error);
-    toast.error("Erro ao carregar registros");
-  }
-};
+      let resolvido = false;
 
-const obterLocalizacaoPrecisa = (): Promise<{
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-}> => {
-  if (!navigator.geolocation) {
-    return Promise.reject(
-      new Error("Geolocalização não suportada neste navegador")
-    );
-  }
+      const finalizar = (callback: () => void, watchId: number) => {
+        if (resolvido) return;
+        resolvido = true;
+        navigator.geolocation.clearWatch(watchId);
+        callback();
+      };
 
-  return new Promise((resolve, reject) => {
-    const leituras: Array<{
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-    }> = [];
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const leitura = {
+            latitude: Number(position.coords.latitude.toFixed(8)),
+            longitude: Number(position.coords.longitude.toFixed(8)),
+            accuracy: Number(position.coords.accuracy.toFixed(2)),
+          };
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const leitura = {
-          latitude: Number(position.coords.latitude.toFixed(8)),
-          longitude: Number(position.coords.longitude.toFixed(8)),
-          accuracy: Number(position.coords.accuracy.toFixed(2)),
-        };
+          leituras.push(leitura);
 
-        console.log("Nova leitura:", leitura);
-        console.log(
-          "Mapa:",
-          `https://www.google.com/maps?q=${leitura.latitude},${leitura.longitude}`
-        );
-
-        leituras.push(leitura);
-
-        if (leitura.accuracy <= 30) {
-          navigator.geolocation.clearWatch(watchId);
-          resolve(leitura);
-          return;
-        }
-
-        if (leituras.length >= 3) {
-          navigator.geolocation.clearWatch(watchId);
-
-          const melhor = [...leituras].sort(
-            (a, b) => a.accuracy - b.accuracy
-          )[0];
-
-          if (melhor.accuracy > 150) {
-            reject(
-              new Error(
-                `Localização imprecisa (${Math.round(
-                  melhor.accuracy
-                )}m). Tente no celular com GPS ligado.`
-              )
-            );
+          if (leitura.accuracy <= 30) {
+            finalizar(() => resolve(leitura), watchId);
             return;
           }
 
-          resolve(melhor);
+          if (leituras.length >= 3) {
+            const melhor = [...leituras].sort(
+              (a, b) => a.accuracy - b.accuracy,
+            )[0];
+
+            if (melhor.accuracy > 150) {
+              finalizar(
+                () =>
+                  reject(
+                    new Error(
+                      `Localização imprecisa (${Math.round(
+                        melhor.accuracy,
+                      )}m). Tente no celular com GPS ligado.`,
+                    ),
+                  ),
+                watchId,
+              );
+              return;
+            }
+
+            finalizar(() => resolve(melhor), watchId);
+          }
+        },
+        (error) => {
+          let mensagem = "Não foi possível obter a localização";
+
+          if (error.code === error.PERMISSION_DENIED) {
+            mensagem = "Permissão de localização negada";
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            mensagem = "Localização indisponível no dispositivo";
+          } else if (error.code === error.TIMEOUT) {
+            mensagem = "Tempo esgotado ao obter localização";
+          }
+
+          finalizar(() => reject(new Error(mensagem)), watchId);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 20000,
+        },
+      );
+
+      setTimeout(() => {
+        if (resolvido) return;
+
+        if (leituras.length === 0) {
+          finalizar(
+            () =>
+              reject(new Error("Nenhuma leitura de localização foi obtida")),
+            watchId,
+          );
+          return;
         }
-      },
-      (error) => {
-        navigator.geolocation.clearWatch(watchId);
 
-        let mensagem = "Não foi possível obter a localização";
+        const melhor = [...leituras].sort((a, b) => a.accuracy - b.accuracy)[0];
 
-        if (error.code === error.PERMISSION_DENIED) {
-          mensagem = "Permissão de localização negada";
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          mensagem = "Localização indisponível no dispositivo";
-        } else if (error.code === error.TIMEOUT) {
-          mensagem = "Tempo esgotado ao obter localização";
+        if (melhor.accuracy > 150) {
+          finalizar(
+            () =>
+              reject(
+                new Error(
+                  `Localização imprecisa (${Math.round(
+                    melhor.accuracy,
+                  )}m). Tente no celular com GPS ligado.`,
+                ),
+              ),
+            watchId,
+          );
+          return;
         }
 
-        reject(new Error(mensagem));
+        finalizar(() => resolve(melhor), watchId);
+      }, 12000);
+    });
+  };
+
+  const registrarPonto = async (
+    tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO",
+  ) => {
+    const { latitude, longitude, accuracy } = await obterLocalizacaoPrecisa();
+
+    const response = await fetch(`/api/ponto/registrar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20000,
-      }
-    );
-
-    setTimeout(() => {
-      navigator.geolocation.clearWatch(watchId);
-
-      if (leituras.length === 0) {
-        reject(new Error("Nenhuma leitura de localização foi obtida"));
-        return;
-      }
-
-      const melhor = [...leituras].sort(
-        (a, b) => a.accuracy - b.accuracy
-      )[0];
-
-      if (melhor.accuracy > 150) {
-        reject(
-          new Error(
-            `Localização imprecisa (${Math.round(
-              melhor.accuracy
-            )}m). Tente no celular com GPS ligado.`
-          )
-        );
-        return;
-      }
-
-      resolve(melhor);
-    }, 12000);
-  });
-};
-
-const registrarPonto = async (
-  tipo: "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO"
-) => {
-  const { latitude, longitude, accuracy } = await obterLocalizacaoPrecisa();
-
-  const response = await fetch(`/api/ponto/registrar`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      funcionarioId,
-      tipo,
-      latitude,
-      longitude,
-      accuracy,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Erro ao registrar ponto");
-  }
-
-  return data;
-};
-
-const handleClockIn = async () => {
-  try {
-    await registrarPonto("ENTRADA");
-    await carregarPontos();
-    setWorkStatus("trabalhando");
-
-    toast.success("Entrada registrada com sucesso!", {
-      description: formatTime(new Date()),
+      body: JSON.stringify({
+        funcionarioId,
+        tipo,
+        latitude,
+        longitude,
+        accuracy,
+      }),
     });
-  } catch (error) {
-    console.error(error);
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Não foi possível registrar a entrada"
-    );
-  }
-};
 
-const handleClockOut = async () => {
-  try {
-    await registrarPonto("SAIDA");
-    await carregarPontos();
-    setWorkStatus("fora");
+    const data = await response.json();
 
-    toast.success("Saída registrada com sucesso!", {
-      description: formatTime(new Date()),
+    if (!response.ok) {
+      throw new Error(data.message || "Erro ao registrar ponto");
+    }
+
+    return data as ApiTimeEntry;
+  };
+
+  const adicionarRegistroLocal = (novoRegistroApi: ApiTimeEntry) => {
+    const novoRegistro = mapApiEntryToUi(novoRegistroApi);
+
+    setTimeEntries((prev) => {
+      return [...prev, novoRegistro].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+      );
     });
-  } catch (error) {
-    console.error(error);
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Não foi possível registrar a saída"
-    );
-  }
-};
+  };
 
-const handlePauseStart = async () => {
-  try {
-    await registrarPonto("SAIDA_ALMOCO");
-    await carregarPontos();
-    setWorkStatus("pausa");
+  const handleClockIn = async () => {
+    try {
+      setIsSubmitting(true);
+      const novoRegistro = await registrarPonto("ENTRADA");
+      adicionarRegistroLocal(novoRegistro);
 
-    toast.info("Pausa iniciada", {
-      description: formatTime(new Date()),
-    });
-  } catch (error) {
-    console.error(error);
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Não foi possível iniciar a pausa"
-    );
-  }
-};
+      toast.success("Entrada registrada com sucesso!", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível registrar a entrada",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-const handlePauseEnd = async () => {
-  try {
-    await registrarPonto("VOLTA_ALMOCO");
-    await carregarPontos();
-    setWorkStatus("trabalhando");
+  const handleClockOut = async () => {
+    try {
+      setIsSubmitting(true);
+      const novoRegistro = await registrarPonto("SAIDA");
+      adicionarRegistroLocal(novoRegistro);
 
-    toast.info("Pausa finalizada", {
-      description: formatTime(new Date()),
-    });
-  } catch (error) {
-    console.error(error);
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Não foi possível finalizar a pausa"
-    );
-  }
-};
+      toast.success("Saída registrada com sucesso!", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível registrar a saída",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePauseStart = async () => {
+    try {
+      setIsSubmitting(true);
+      const novoRegistro = await registrarPonto("SAIDA_ALMOCO");
+      adicionarRegistroLocal(novoRegistro);
+
+      toast.info("Pausa iniciada", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível iniciar a pausa",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePauseEnd = async () => {
+    try {
+      setIsSubmitting(true);
+      const novoRegistro = await registrarPonto("VOLTA_ALMOCO");
+      adicionarRegistroLocal(novoRegistro);
+
+      toast.info("Pausa finalizada", {
+        description: formatTime(new Date()),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível finalizar a pausa",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const getStatusBadge = () => {
     switch (workStatus) {
@@ -694,10 +677,11 @@ const handlePauseEnd = async () => {
                     >
                       <Button
                         onClick={handleClockIn}
+                        disabled={isSubmitting}
                         className="h-14 w-full bg-green-600 text-lg hover:bg-green-700"
                       >
                         <LogIn className="mr-2 size-5" />
-                        Registrar Entrada
+                        {isSubmitting ? "Registrando..." : "Registrar Entrada"}
                       </Button>
                     </motion.div>
                   )}
@@ -712,18 +696,20 @@ const handlePauseEnd = async () => {
                     >
                       <Button
                         onClick={handlePauseStart}
+                        disabled={isSubmitting}
                         className="h-14 w-full bg-yellow-500 text-lg hover:bg-yellow-600"
                       >
                         <Coffee className="mr-2 size-5" />
-                        Iniciar Pausa
+                        {isSubmitting ? "Registrando..." : "Iniciar Pausa"}
                       </Button>
                       <Button
                         onClick={handleClockOut}
+                        disabled={isSubmitting}
                         variant="outline"
                         className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
                       >
                         <LogOut className="mr-2 size-5" />
-                        Registrar Saída
+                        {isSubmitting ? "Registrando..." : "Registrar Saída"}
                       </Button>
                     </motion.div>
                   )}
@@ -738,18 +724,20 @@ const handlePauseEnd = async () => {
                     >
                       <Button
                         onClick={handlePauseEnd}
+                        disabled={isSubmitting}
                         className="h-14 w-full bg-blue-600 text-lg hover:bg-blue-700"
                       >
                         <CheckCircle2 className="mr-2 size-5" />
-                        Finalizar Pausa
+                        {isSubmitting ? "Registrando..." : "Finalizar Pausa"}
                       </Button>
                       <Button
                         onClick={handleClockOut}
+                        disabled={isSubmitting}
                         variant="outline"
                         className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
                       >
                         <LogOut className="mr-2 size-5" />
-                        Registrar Saída
+                        {isSubmitting ? "Registrando..." : "Registrar Saída"}
                       </Button>
                     </motion.div>
                   )}
@@ -795,7 +783,11 @@ const handlePauseEnd = async () => {
                 </h3>
 
                 <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {timeEntries.length === 0 ? (
+                  {isLoadingEntries ? (
+                    <div className="py-8 text-center text-slate-500">
+                      <p>Carregando registros...</p>
+                    </div>
+                  ) : timeEntries.length === 0 ? (
                     <div className="py-8 text-center text-slate-500">
                       <Clock className="mx-auto mb-2 size-12 opacity-50" />
                       <p>Nenhum registro hoje</p>

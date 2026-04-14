@@ -78,7 +78,6 @@ async function apiFetch(url: string, options: RequestInit = {}) {
   });
 
   const contentType = response.headers.get("content-type") || "";
-
   let data: any = null;
 
   if (contentType.includes("application/json")) {
@@ -106,7 +105,8 @@ export default function DeliveryReports() {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [mensagem, setMensagem] = useState("");
@@ -175,15 +175,16 @@ export default function DeliveryReports() {
       setErro(err?.message || "Não foi possível carregar os relatórios.");
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }
 
   useEffect(() => {
-    carregarCidades();
+    void carregarCidades();
   }, []);
 
   useEffect(() => {
-    carregarEntregas();
+    void carregarEntregas();
   }, [cidade, status, dataInicio, dataFim, busca]);
 
   useEffect(() => {
@@ -485,6 +486,38 @@ export default function DeliveryReports() {
 
     return date.toLocaleDateString("pt-BR");
   }
+  function formatarEndereco(texto?: string | null) {
+  if (!texto) return "-";
+
+  return texto
+    // normaliza espaços
+    .replace(/\s+/g, " ")
+
+    // 126TELEFONE → 126 TELEFONE
+    .replace(/(\d)([A-Z]{2,})/g, "$1 $2")
+
+    // CASA10 → CASA 10
+    .replace(/([A-Z]{2,})(\d)/g, "$1 $2")
+
+    // CASA 10B → CASA 10 B
+    .replace(/(\d)([A-Z]\b)/g, "$1 $2")
+
+    // BTELEFONE → B TELEFONE (apenas quando TELEFONE aparece)
+    .replace(/\b([A-Z])(TELEFONE|CONTATO|CELULAR|WHATSAPP)/g, "$1 $2")
+
+    // LOJATELEFONE → LOJA TELEFONE
+    .replace(/(LOJA)(TELEFONE)/g, "$1 $2")
+
+    // vírgulas corretas
+    .replace(/,\s*/g, ", ")
+
+    // hífen correto
+    .replace(/\s*-\s*/g, " - ")
+
+    // remove espaços duplicados
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
   function formatarHorario(data?: string | null) {
     if (!data) return "-";
@@ -524,6 +557,43 @@ export default function DeliveryReports() {
     });
   }
 
+  if (initialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-blue-700">
+          <div className="flex items-center gap-2">
+            <Loader2 size={18} className="animate-spin" />
+            Carregando relatórios, aguarde...
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 w-24 rounded bg-gray-200" />
+                <div className="h-10 w-32 rounded bg-gray-200" />
+                <div className="h-3 w-20 rounded bg-gray-200" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 w-48 rounded bg-gray-200" />
+            <div className="h-12 w-full rounded bg-gray-200" />
+            <div className="h-12 w-full rounded bg-gray-200" />
+            <div className="h-12 w-full rounded bg-gray-200" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
@@ -556,7 +626,7 @@ export default function DeliveryReports() {
 
           <button
             onClick={importarArquivo}
-            disabled={uploading}
+            disabled={uploading || loading}
             className="flex items-center gap-2 rounded-xl bg-[#15182e] px-4 py-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {uploading ? (
@@ -569,7 +639,8 @@ export default function DeliveryReports() {
 
           <button
             onClick={exportarEntregas}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50"
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#15182e] shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Download size={16} />
             {entregasSelecionadas.length > 0
@@ -579,7 +650,7 @@ export default function DeliveryReports() {
 
           <button
             onClick={handleApagar}
-            disabled={deleting || uploading}
+            disabled={deleting || uploading || loading}
             className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {deleting ? (
@@ -601,7 +672,7 @@ export default function DeliveryReports() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={selecionarTodasPlanilhas}
-              disabled={arquivosUnicos.length === 0}
+              disabled={arquivosUnicos.length === 0 || loading}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Selecionar todas
@@ -609,7 +680,7 @@ export default function DeliveryReports() {
 
             <button
               onClick={limparSelecaoPlanilhas}
-              disabled={arquivosSelecionados.length === 0}
+              disabled={arquivosSelecionados.length === 0 || loading}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Limpar seleção
@@ -632,6 +703,7 @@ export default function DeliveryReports() {
                   type="checkbox"
                   checked={arquivosSelecionados.includes(nomeArquivo)}
                   onChange={() => toggleArquivo(nomeArquivo)}
+                  disabled={loading}
                 />
                 <span className="text-sm text-[#15182e]">{nomeArquivo}</span>
               </label>
@@ -652,73 +724,116 @@ export default function DeliveryReports() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Valor Total</p>
-          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
-            {formatarValor(dados?.financeiro?.valorTotal ?? 0)}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Faturamento total</p>
+      {loading && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          <div className="flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin" />
+            Carregando relatórios, aguarde...
+          </div>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Ticket Médio</p>
-          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
-            {formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Média por entrega</p>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 w-24 rounded bg-gray-200" />
+                <div className="h-10 w-32 rounded bg-gray-200" />
+                <div className="h-3 w-20 rounded bg-gray-200" />
+              </div>
+            </div>
+          ))}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Valor Total</p>
+            <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+              {formatarValor(dados?.financeiro?.valorTotal ?? 0)}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Faturamento total</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Maior Entrega</p>
-          <h3 className="mt-4 text-4xl font-bold text-green-600">
-            {formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Maior valor</p>
-        </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Ticket Médio</p>
+            <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+              {formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Média por entrega</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Menor Entrega</p>
-          <h3 className="mt-4 text-4xl font-bold text-blue-600">
-            {formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Menor valor</p>
-        </div>
-      </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Maior Entrega</p>
+            <h3 className="mt-4 text-4xl font-bold text-green-600">
+              {formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Maior valor</p>
+          </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Total de Entregas</p>
-          <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
-            {dados?.stats.totalEntregas ?? 0}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Resultado filtrado</p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Menor Entrega</p>
+            <h3 className="mt-4 text-4xl font-bold text-blue-600">
+              {formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Menor valor</p>
+          </div>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Entregues</p>
-          <h3 className="mt-4 text-4xl font-bold text-green-600">
-            {dados?.stats.entregues ?? 0}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Concluídas</p>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`stats-${index}`}
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 w-24 rounded bg-gray-200" />
+                <div className="h-10 w-24 rounded bg-gray-200" />
+                <div className="h-3 w-20 rounded bg-gray-200" />
+              </div>
+            </div>
+          ))}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Total de Entregas</p>
+            <h3 className="mt-4 text-4xl font-bold text-[#15182e]">
+              {dados?.stats.totalEntregas ?? 0}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Resultado filtrado</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Em Rota</p>
-          <h3 className="mt-4 text-4xl font-bold text-blue-600">
-            {dados?.stats.emRota ?? 0}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Em andamento</p>
-        </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Entregues</p>
+            <h3 className="mt-4 text-4xl font-bold text-green-600">
+              {dados?.stats.entregues ?? 0}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Concluídas</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-[#646680]">Pendentes</p>
-          <h3 className="mt-4 text-4xl font-bold text-yellow-500">
-            {dados?.stats.pendentes ?? 0}
-          </h3>
-          <p className="mt-2 text-sm text-[#8c8da9]">Aguardando</p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Em Rota</p>
+            <h3 className="mt-4 text-4xl font-bold text-blue-600">
+              {dados?.stats.emRota ?? 0}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Em andamento</p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#646680]">Pendentes</p>
+            <h3 className="mt-4 text-4xl font-bold text-yellow-500">
+              {dados?.stats.pendentes ?? 0}
+            </h3>
+            <p className="mt-2 text-sm text-[#8c8da9]">Aguardando</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
@@ -730,7 +845,8 @@ export default function DeliveryReports() {
                 placeholder="Buscar por código, endereço, cidade ou entregador..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="w-full bg-transparent text-sm outline-none"
+                disabled={loading}
+                className="w-full bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
           </div>
@@ -738,7 +854,8 @@ export default function DeliveryReports() {
           <select
             value={cidade}
             onChange={(e) => setCidade(e.target.value)}
-            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+            disabled={loading}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">Todas as cidades</option>
             {cidades.map((cidadeItem) => (
@@ -751,7 +868,8 @@ export default function DeliveryReports() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+            disabled={loading}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">Todos os status</option>
             <option value="ENTREGUE">Entregue</option>
@@ -764,21 +882,24 @@ export default function DeliveryReports() {
             type="date"
             value={dataInicio}
             onChange={(e) => setDataInicio(e.target.value)}
-            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+            disabled={loading}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <input
             type="date"
             value={dataFim}
             onChange={(e) => setDataFim(e.target.value)}
-            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none"
+            disabled={loading}
+            className="rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={limparFiltros}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-[#15182e] hover:bg-gray-50"
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-[#15182e] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Filter size={15} />
             Limpar filtros
@@ -800,7 +921,7 @@ export default function DeliveryReports() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={selecionarTodasEntregas}
-              disabled={entregas.length === 0}
+              disabled={entregas.length === 0 || loading}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Selecionar todas
@@ -808,7 +929,7 @@ export default function DeliveryReports() {
 
             <button
               onClick={limparSelecaoEntregas}
-              disabled={entregasSelecionadas.length === 0}
+              disabled={entregasSelecionadas.length === 0 || loading}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Limpar seleção
@@ -819,7 +940,7 @@ export default function DeliveryReports() {
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-[#646680]">
             <Loader2 size={18} className="animate-spin" />
-            Carregando...
+            Buscando informações dos relatórios...
           </div>
         ) : entregas.length === 0 ? (
           <div className="py-10 text-center text-[#646680]">
@@ -837,6 +958,7 @@ export default function DeliveryReports() {
                     type="checkbox"
                     checked={entregasSelecionadas.includes(entrega.id)}
                     onChange={() => toggleEntrega(entrega.id)}
+                    disabled={loading}
                     className="mt-1"
                   />
 
@@ -858,10 +980,10 @@ export default function DeliveryReports() {
                     <div className="flex items-center gap-2 text-sm text-[#646680]">
                       <MapPin size={15} />
                       <span>
-                        {[entrega.endereco, entrega.cidade]
-                          .filter(Boolean)
-                          .join(" - ")}
-                      </span>
+  {[formatarEndereco(entrega.endereco), entrega.cidade]
+    .filter(Boolean)
+    .join(" - ")}
+</span>
                     </div>
 
                     <div className="text-sm text-[#646680]">

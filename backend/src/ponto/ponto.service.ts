@@ -1,29 +1,29 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { tipo_registro_ponto } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { tipo_registro_ponto } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 
 /**
  * Tipo que representa um local permitido para registrar ponto
  * Define as coordenadas e raio de geolocalização aceitos
  */
 type LocalPermitido = {
-  nome: string;           // Nome descritivo do local
-  latitude: number;       // Coordenada de latitude
-  longitude: number;      // Coordenada de longitude
-  raio: number;          // Raio em metros permitido para registrar ponto
+  nome: string; // Nome descritivo do local
+  latitude: number; // Coordenada de latitude
+  longitude: number; // Coordenada de longitude
+  raio: number; // Raio em metros permitido para registrar ponto
 };
 
 /**
  * Serviço de Ponto (PontoService)
- * 
+ *
  * Responsabilidades:
  * - Validar localização do funcionário via GPS
  * - Registrar pontos (entrada, saída, pausas)
  * - Calcular tempo trabalhado
  * - Integrar com WhatsApp para confirmação
  * - Listar histórico de pontos
- * 
+ *
  * Validações implementadas:
  * 1. Coordenadas geograficamente válidas
  * 2. Precisão do GPS (máximo 100 metros)
@@ -45,13 +45,13 @@ export class PontoService {
    */
   private readonly locaisPermitidos: LocalPermitido[] = [
     {
-      nome: 'Unidade 1 - Rua Abuassali Abujamra, 209',
+      nome: "Unidade 1 - Rua Abuassali Abujamra, 209",
       latitude: -22.9768652,
       longitude: -49.8795224,
       raio: 300,
     },
     {
-      nome: 'Unidade 2 - Rua Amazonas, 530',
+      nome: "Unidade 2 - Rua Amazonas, 530",
       latitude: -22.974029,
       longitude: -49.868587,
       raio: 300,
@@ -65,7 +65,7 @@ export class PontoService {
    */
   private formatarDuracao(ms: number): string {
     // Retorna "0min" para durações negativas ou zeradas
-    if (ms <= 0) return '0min';
+    if (ms <= 0) return "0min";
 
     // Converte milissegundos para minutos
     const totalMinutos = Math.floor(ms / 1000 / 60);
@@ -89,7 +89,10 @@ export class PontoService {
    * @returns Coordenada normalizada com 8 casas decimais
    * @throws BadRequestException - Se coordenada for inválida
    */
-  private normalizarCoordenada(valor: number, tipo: 'latitude' | 'longitude'): number {
+  private normalizarCoordenada(
+    valor: number,
+    tipo: "latitude" | "longitude",
+  ): number {
     // Converte para número
     const numero = Number(valor);
 
@@ -99,13 +102,13 @@ export class PontoService {
     }
 
     // Valida intervalo de latitude (-90 a 90 graus)
-    if (tipo === 'latitude' && (numero < -90 || numero > 90)) {
-      throw new BadRequestException('Latitude fora do intervalo válido');
+    if (tipo === "latitude" && (numero < -90 || numero > 90)) {
+      throw new BadRequestException("Latitude fora do intervalo válido");
     }
 
     // Valida intervalo de longitude (-180 a 180 graus)
-    if (tipo === 'longitude' && (numero < -180 || numero > 180)) {
-      throw new BadRequestException('Longitude fora do intervalo válido');
+    if (tipo === "longitude" && (numero < -180 || numero > 180)) {
+      throw new BadRequestException("Longitude fora do intervalo válido");
     }
 
     // Retorna coordenada com precisão de 8 casas decimais (~1 metro)
@@ -122,12 +125,12 @@ export class PontoService {
   private validarCoordenadas(latitude?: number, longitude?: number) {
     // Verifica se ambas as coordenadas foram fornecidas
     if (latitude == null || longitude == null) {
-      throw new BadRequestException('Localização não informada');
+      throw new BadRequestException("Localização não informada");
     }
 
     // Normaliza latitude e longitude
-    const lat = this.normalizarCoordenada(latitude, 'latitude');
-    const lng = this.normalizarCoordenada(longitude, 'longitude');
+    const lat = this.normalizarCoordenada(latitude, "latitude");
+    const lng = this.normalizarCoordenada(longitude, "longitude");
 
     return { lat, lng };
   }
@@ -159,9 +162,7 @@ export class PontoService {
     // Fórmula de Haversine - parte 1
     const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2;
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
 
     // Fórmula de Haversine - parte 2
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -216,7 +217,7 @@ export class PontoService {
 
   /**
    * Registra um ponto (entrada/saída) para um funcionário
-   * 
+   *
    * Processo:
    * 1. Valida coordenadas geográficas
    * 2. Verifica precisão do GPS
@@ -225,7 +226,7 @@ export class PontoService {
    * 5. Registra no banco de dados
    * 6. Calcula tempo trabalhado
    * 7. Envia notificação WhatsApp
-   * 
+   *
    * @param funcionarioId - ID do funcionário
    * @param tipo - Tipo de ponto: ENTRADA, SAIDA, SAIDA_ALMOCO, VOLTA_ALMOCO
    * @param latitude - Latitude da localização
@@ -251,7 +252,7 @@ export class PontoService {
           : Number(Number(accuracy).toFixed(2));
 
       // Log de debug com dados normalizados
-      console.log('REGISTRAR PONTO:', {
+      console.log("REGISTRAR PONTO:", {
         funcionarioId,
         tipo,
         latitudeOriginal: latitude,
@@ -270,10 +271,10 @@ export class PontoService {
 
       // Etapa 3: Validar tipo de ponto
       const tiposValidos = [
-        'ENTRADA',
-        'SAIDA_ALMOCO',
-        'VOLTA_ALMOCO',
-        'SAIDA',
+        "ENTRADA",
+        "SAIDA_ALMOCO",
+        "VOLTA_ALMOCO",
+        "SAIDA",
       ] as const;
 
       // Normaliza tipo para maiúsculas (entrada → ENTRADA)
@@ -281,7 +282,7 @@ export class PontoService {
 
       // Verifica se tipo é válido
       if (!tiposValidos.includes(tipoNormalizado)) {
-        throw new BadRequestException('Tipo de ponto inválido');
+        throw new BadRequestException("Tipo de ponto inválido");
       }
 
       // Etapa 4: Verificar localização
@@ -289,12 +290,16 @@ export class PontoService {
 
       // Verifica se encontrou algum local permitido
       if (!resultadoLocal.local) {
-        throw new BadRequestException('Nenhum local permitido foi encontrado');
+        throw new BadRequestException("Nenhum local permitido foi encontrado");
       }
 
       // Logs informativos sobre a localização
-      console.log('LOCAL MAIS PRÓXIMO:', resultadoLocal.local.nome);
-      console.log('DISTÂNCIA ATÉ O LOCAL:', Math.round(resultadoLocal.distancia), 'm');
+      console.log("LOCAL MAIS PRÓXIMO:", resultadoLocal.local.nome);
+      console.log(
+        "DISTÂNCIA ATÉ O LOCAL:",
+        Math.round(resultadoLocal.distancia),
+        "m",
+      );
 
       // Verifica se está dentro do raio permitido
       if (resultadoLocal.distancia > resultadoLocal.local.raio) {
@@ -310,14 +315,19 @@ export class PontoService {
         where: {
           id: BigInt(funcionarioId),
         },
-        include: {
-          usuarios: true, // Dados do usuário associado
+        select: {
+          id: true,
+          usuarios: {
+            select: {
+              nome: true,
+            },
+          },
         },
       });
 
       // Verifica se funcionário existe
       if (!funcionario) {
-        throw new BadRequestException('Funcionário não encontrado');
+        throw new BadRequestException("Funcionário não encontrado");
       }
 
       // Etapa 6: Registrar ponto no banco de dados
@@ -335,29 +345,32 @@ export class PontoService {
       });
 
       // Log do ponto salvo com sucesso
-      console.log('PONTO SALVO:', resultado);
+      console.log("PONTO SALVO:", resultado);
 
       // Formata horário para exibição em fuso horário São Paulo
-      const horarioFormatado = new Date(resultado.data_hora).toLocaleString('pt-BR', {
-        timeZone: 'America/Sao_Paulo',
-      });
+      const horarioFormatado = new Date(resultado.data_hora).toLocaleString(
+        "pt-BR",
+        {
+          timeZone: "America/Sao_Paulo",
+        },
+      );
 
       // Inicializa variável para tempo trabalhado
-      let tempoTrabalhado = 'Ainda não calculado';
+      let tempoTrabalhado = "Ainda não calculado";
 
       // Etapa 7: Calcular tempo trabalhado (apenas para SAIDA)
-      if (tipoNormalizado === 'SAIDA') {
+      if (tipoNormalizado === "SAIDA") {
         // Busca última entrada anterior a essa saída
         const ultimaEntrada = await this.prisma.registros_ponto.findFirst({
           where: {
             funcionario_id: BigInt(funcionarioId),
-            tipo: 'ENTRADA',
+            tipo: "ENTRADA",
             data_hora: {
               lt: resultado.data_hora, // Data anterior à saída
             },
           },
           orderBy: {
-            data_hora: 'desc', // Ordena por mais recente primeiro
+            data_hora: "desc", // Ordena por mais recente primeiro
           },
         });
 
@@ -371,7 +384,7 @@ export class PontoService {
           tempoTrabalhado = this.formatarDuracao(diferencaMs);
         } else {
           // Se não houver entrada anterior, exibe mensagem
-          tempoTrabalhado = 'Sem entrada anterior';
+          tempoTrabalhado = "Sem entrada anterior";
         }
       }
 
@@ -390,10 +403,10 @@ export class PontoService {
         });
 
         // Log de sucesso
-        console.log('WHATSAPP ENVIADO COM SUCESSO');
+        console.log("WHATSAPP ENVIADO COM SUCESSO");
       } catch (erroWhatsapp) {
         // Erro ao enviar WhatsApp não impede registro do ponto
-        console.error('ERRO AO ENVIAR WHATSAPP:', erroWhatsapp);
+        console.error("ERRO AO ENVIAR WHATSAPP:", erroWhatsapp);
       }
 
       // Retorna dados do ponto registrado (convertendo BigInt para string)
@@ -404,7 +417,7 @@ export class PontoService {
       };
     } catch (error) {
       // Log de erro e re-lança para tratamento no controller
-      console.error('ERRO AO REGISTRAR PONTO:', error);
+      console.error("ERRO AO REGISTRAR PONTO:", error);
       throw error;
     }
   }
@@ -416,29 +429,41 @@ export class PontoService {
    */
   async listarPontos(funcionarioId: number) {
     try {
-      // Log de debug
-      console.log('LISTAR PONTOS:', { funcionarioId });
+      console.log("LISTAR PONTOS:", { funcionarioId });
 
-      // Busca todos os pontos do funcionário, ordenados do mais recente ao mais antigo
+      const agora = new Date();
+
+      const inicioDoDia = new Date(agora);
+      inicioDoDia.setHours(0, 0, 0, 0);
+
+      const fimDoDia = new Date(agora);
+      fimDoDia.setHours(23, 59, 59, 999);
+
       const pontos = await this.prisma.registros_ponto.findMany({
         where: {
           funcionario_id: BigInt(funcionarioId),
+          data_hora: {
+            gte: inicioDoDia,
+            lte: fimDoDia,
+          },
         },
         orderBy: {
-          data_hora: 'desc',
+          data_hora: "asc",
+        },
+        select: {
+          id: true,
+          tipo: true,
+          data_hora: true,
         },
       });
 
-      // Mapeia resultados convertendo BigInt para string (para compatibilidade JSON)
       return pontos.map((ponto) => ({
-        ...ponto,
         id: ponto.id.toString(),
-        funcionario_id: ponto.funcionario_id.toString(),
+        tipo: ponto.tipo,
+        data_hora: ponto.data_hora,
       }));
     } catch (error) {
-      // Log de erro
-      console.error('ERRO AO LISTAR PONTOS:', error);
-      // Re-lança o erro para tratamento no controller
+      console.error("ERRO AO LISTAR PONTOS:", error);
       throw error;
     }
   }
