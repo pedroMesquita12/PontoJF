@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Package, User, Lock, LogIn } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Package, User, Lock, LogIn, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 
@@ -30,16 +31,45 @@ function isAdminUser(perfil?: string) {
   return (perfil || "").toUpperCase().trim() === "DONO";
 }
 
+function getMensagemErroLogin(message: string) {
+  const texto = message.toLowerCase();
+
+  if (
+    texto.includes("unauthorized") ||
+    texto.includes("credenciais") ||
+    texto.includes("inválid") ||
+    texto.includes("invalid") ||
+    texto.includes("senha") ||
+    texto.includes("matrícula")
+  ) {
+    return "Matrícula ou senha inválida. Verifique os dados e tente novamente.";
+  }
+
+  if (texto.includes("blocked") || texto.includes("inativo") || texto.includes("desativado")) {
+    return "Seu acesso está inativo. Entre em contato com o administrador.";
+  }
+
+  if (texto.includes("failed to fetch") || texto.includes("network") || texto.includes("cors")) {
+    return "Não foi possível conectar ao servidor. Tente novamente em instantes.";
+  }
+
+  return message || "Não foi possível fazer login. Tente novamente.";
+}
+
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [matricula, setMatricula] = useState("");
   const [senha, setSenha] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [erroLogin, setErroLogin] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErroLogin("");
 
     if (!matricula || !senha) {
-      toast.error("Por favor, preencha todos os campos");
+      const mensagem = "Por favor, preencha matrícula e senha.";
+      setErroLogin(mensagem);
+      toast.error(mensagem);
       return;
     }
 
@@ -87,7 +117,10 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erro ao fazer login";
-      toast.error(message);
+
+      const mensagemAmigavel = getMensagemErroLogin(message);
+      setErroLogin(mensagemAmigavel);
+      toast.error(mensagemAmigavel);
     } finally {
       setIsLoading(false);
     }
@@ -123,8 +156,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               Entre com sua matrícula e senha para registrar o ponto
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {erroLogin && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Não foi possível entrar</AlertTitle>
+                  <AlertDescription>{erroLogin}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="matricula">Matrícula</Label>
                 <div className="relative">
