@@ -48,6 +48,10 @@ export class AuthService {
         data: { ultimo_login: new Date() },
       });
 
+      const perfil = String(funcionario.usuarios.perfil || '')
+        .trim()
+        .toUpperCase();
+
       const user = {
         id: Number(funcionario.id),
         usuarioId: Number(funcionario.usuarios.id),
@@ -55,7 +59,7 @@ export class AuthService {
         email: funcionario.usuarios.email,
         matricula: funcionario.matricula,
         cargo: funcionario.cargos?.nome ?? 'Funcionário',
-        perfil: funcionario.usuarios.perfil,
+        perfil,
       };
 
       const payload = {
@@ -64,8 +68,10 @@ export class AuthService {
         nome: funcionario.usuarios.nome,
         email: funcionario.usuarios.email,
         matricula: funcionario.matricula,
-        perfil: funcionario.usuarios.perfil,
+        perfil,
       };
+
+      console.log('PAYLOAD JWT:', payload);
 
       const accessToken = this.jwtService.sign(payload);
 

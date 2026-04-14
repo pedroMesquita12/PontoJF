@@ -45,11 +45,19 @@ function getMensagemErroLogin(message: string) {
     return "Matrícula ou senha inválida. Verifique os dados e tente novamente.";
   }
 
-  if (texto.includes("blocked") || texto.includes("inativo") || texto.includes("desativado")) {
+  if (
+    texto.includes("blocked") ||
+    texto.includes("inativo") ||
+    texto.includes("desativado")
+  ) {
     return "Seu acesso está inativo. Entre em contato com o administrador.";
   }
 
-  if (texto.includes("failed to fetch") || texto.includes("network") || texto.includes("cors")) {
+  if (
+    texto.includes("failed to fetch") ||
+    texto.includes("network") ||
+    texto.includes("cors")
+  ) {
     return "Não foi possível conectar ao servidor. Tente novamente em instantes.";
   }
 
@@ -76,6 +84,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       setIsLoading(true);
 
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: {
@@ -87,27 +98,36 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         }),
       });
 
-      const data = await response.json();
+      let data: any = null;
 
-      if (!response.ok) {
-        throw new Error(data.message || "Erro ao fazer login");
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
 
-      const cargo = data.user.cargo ?? "Funcionário";
-      const perfil = data.user.perfil ?? "FUNCIONARIO";
+      if (!response.ok) {
+        throw new Error(data?.message || "Erro ao fazer login");
+      }
+
+      const cargo = data?.user?.cargo ?? "Funcionário";
+      const perfil = data?.user?.perfil ?? "FUNCIONARIO";
 
       const user: UserData = {
-        id: data.user.id,
-        usuarioId: data.user.usuarioId,
-        matricula: data.user.matricula,
-        nome: data.user.nome,
-        email: data.user.email,
-        cargo,
-        perfil,
+        id: Number(data.user.id),
+        usuarioId: Number(data.user.usuarioId),
+        matricula: String(data.user.matricula),
+        nome: String(data.user.nome),
+        email: String(data.user.email),
+        cargo: String(cargo),
+        perfil: String(perfil).toUpperCase().trim(),
         isAdmin: isAdminUser(perfil),
         token: data.accessToken,
         accessToken: data.accessToken,
       };
+
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
 
       localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("token", data.accessToken);
@@ -115,6 +135,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       toast.success(`Bem-vindo(a), ${user.nome}!`);
       onLogin(user);
     } catch (error) {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+
       const message =
         error instanceof Error ? error.message : "Erro ao fazer login";
 
@@ -143,6 +166,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           >
             <Package className="size-12" />
           </motion.div>
+
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Express Encomendas
           </h1>

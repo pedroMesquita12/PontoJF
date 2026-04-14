@@ -259,7 +259,7 @@ export class AdminService {
 
     return funcionarios.map((f) => {
       const registrosDoFuncionario = registrosSemana.filter(
-        (r) => String(r.funcionario_id) === String(f.id),
+        (r) => Number(r.funcionario_id) === Number(f.id),
       ) as RegistroPonto[];
 
       const registrosDia = registrosDoFuncionario.filter((r) => {
@@ -270,7 +270,7 @@ export class AdminService {
       const resumoSemana = this.calcularResumo(registrosDoFuncionario);
 
       return {
-        id: String(f.id),
+        id: Number(f.id),
         matricula: f.matricula,
         nome: f.usuarios.nome,
         cargo: f.cargos?.nome ?? 'Funcionário',

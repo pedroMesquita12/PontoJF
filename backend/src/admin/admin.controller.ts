@@ -10,6 +10,7 @@ export class AdminController {
 
   @Get('ponto/funcionarios')
   async listarFuncionarios(@Req() req: any, @Query('date') date?: string) {
+    console.log('REQ.USER PONTO FUNCIONARIOS:', req.user);
     validarAcessoTelaAdmin(req.user);
 
     const data = date || new Date().toISOString().split('T')[0];
@@ -18,6 +19,7 @@ export class AdminController {
 
   @Get('overview')
   async obterOverview(@Req() req: any, @Query('date') date?: string) {
+    console.log('REQ.USER ADMIN OVERVIEW:', req.user);
     validarAcessoTelaAdmin(req.user);
 
     const data = date || new Date().toISOString().split('T')[0];
