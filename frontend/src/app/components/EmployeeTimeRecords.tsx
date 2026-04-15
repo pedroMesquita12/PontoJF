@@ -46,25 +46,70 @@ export function EmployeeTimeRecords() {
   );
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const carregar = async () => {
       try {
         setIsLoading(true);
+        setErrorMessage("");
 
-        const response = await fetch(
-          `${API_URL}/admin/ponto/funcionarios?date=${selectedDate}`
-        );
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          throw new Error("Token não encontrado. Faça login novamente.");
+        }
+
+        const url = `${API_URL}/admin/ponto/funcionarios?date=${selectedDate}`;
+        console.log("Buscando registros em:", url);
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        console.log("Status da resposta:", response.status);
 
         if (!response.ok) {
-          throw new Error("Erro ao carregar registros de ponto");
+          let mensagem = `Erro ao carregar registros (${response.status})`;
+
+          try {
+            const erro = await response.json();
+            console.log("Resposta de erro:", erro);
+
+            if (erro?.message) {
+              mensagem = Array.isArray(erro.message)
+                ? erro.message.join(", ")
+                : erro.message;
+            }
+          } catch {
+            // ignora erro ao tentar ler resposta como JSON
+          }
+
+          throw new Error(mensagem);
         }
 
         const data = await response.json();
-        setEmployees(data);
+        console.log("Funcionários recebidos:", data);
+
+        if (Array.isArray(data)) {
+          setEmployees(data);
+        } else {
+          console.warn("Resposta inesperada da API:", data);
+          setEmployees([]);
+          setErrorMessage("A API retornou um formato inesperado.");
+        }
       } catch (error) {
-        console.error(error);
+        console.error("Erro ao carregar registros de ponto:", error);
         setEmployees([]);
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar os registros."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -74,8 +119,9 @@ export function EmployeeTimeRecords() {
   }, [selectedDate]);
 
   const filteredEmployees = useMemo(() => {
+    const termo = searchTerm.trim().toLowerCase();
+
     return employees.filter((employee) => {
-      const termo = searchTerm.toLowerCase();
       return (
         employee.nome.toLowerCase().includes(termo) ||
         employee.matricula.includes(searchTerm) ||
@@ -84,11 +130,29 @@ export function EmployeeTimeRecords() {
     });
   }, [employees, searchTerm]);
 
+  const sortedEmployees = useMemo(() => {
+    const prioridade: Record<Employee["status"], number> = {
+      trabalhando: 1,
+      pausa: 2,
+      fora: 3,
+    };
+
+    return [...filteredEmployees].sort((a, b) => {
+      const diferencaPrioridade = prioridade[a.status] - prioridade[b.status];
+
+      if (diferencaPrioridade !== 0) {
+        return diferencaPrioridade;
+      }
+
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [filteredEmployees]);
+
   const stats = {
-    totalFuncionarios: filteredEmployees.length,
-    trabalhando: filteredEmployees.filter((e) => e.status === "trabalhando").length,
-    emPausa: filteredEmployees.filter((e) => e.status === "pausa").length,
-    fora: filteredEmployees.filter((e) => e.status === "fora").length,
+    totalFuncionarios: sortedEmployees.length,
+    trabalhando: sortedEmployees.filter((e) => e.status === "trabalhando").length,
+    emPausa: sortedEmployees.filter((e) => e.status === "pausa").length,
+    fora: sortedEmployees.filter((e) => e.status === "fora").length,
   };
 
   const getStatusBadge = (status: Employee["status"]) => {
@@ -157,6 +221,7 @@ export function EmployeeTimeRecords() {
               Histórico e acompanhamento de todos os funcionários
             </p>
           </div>
+
           <Button className="gap-2">
             <Download className="size-4" />
             Exportar Relatório
@@ -170,7 +235,9 @@ export function EmployeeTimeRecords() {
             <CardTitle className="text-sm font-medium text-slate-600">Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{stats.totalFuncionarios}</div>
+            <div className="text-2xl font-bold text-slate-900">
+              {stats.totalFuncionarios}
+            </div>
             <p className="text-xs text-slate-600 mt-1">Funcionários</p>
           </CardContent>
         </Card>
@@ -180,7 +247,9 @@ export function EmployeeTimeRecords() {
             <CardTitle className="text-sm font-medium text-slate-600">Trabalhando</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.trabalhando}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {stats.trabalhando}
+            </div>
           </CardContent>
         </Card>
 
@@ -189,7 +258,9 @@ export function EmployeeTimeRecords() {
             <CardTitle className="text-sm font-medium text-slate-600">Em Pausa</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.emPausa}</div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {stats.emPausa}
+            </div>
           </CardContent>
         </Card>
 
@@ -207,7 +278,9 @@ export function EmployeeTimeRecords() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <Label htmlFor="search" className="sr-only">Buscar</Label>
+              <Label htmlFor="search" className="sr-only">
+                Buscar
+              </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <Input
@@ -221,7 +294,9 @@ export function EmployeeTimeRecords() {
             </div>
 
             <div className="w-full sm:w-auto">
-              <Label htmlFor="date" className="sr-only">Data</Label>
+              <Label htmlFor="date" className="sr-only">
+                Data
+              </Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <Input
@@ -243,7 +318,17 @@ export function EmployeeTimeRecords() {
             Carregando registros...
           </CardContent>
         </Card>
-      ) : filteredEmployees.length === 0 ? (
+      ) : errorMessage ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <AlertCircle className="size-12 text-red-300 mx-auto mb-4" />
+              <p className="text-red-600 font-medium">Erro ao carregar registros</p>
+              <p className="text-slate-600 mt-2">{errorMessage}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : sortedEmployees.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
@@ -254,7 +339,7 @@ export function EmployeeTimeRecords() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredEmployees.map((employee) => (
+          {sortedEmployees.map((employee) => (
             <Card key={employee.id}>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -276,20 +361,26 @@ export function EmployeeTimeRecords() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-slate-600 text-xs">Horas do Dia</p>
-                      <p className="font-semibold text-slate-900">{employee.horasTrabalhadas}</p>
+                      <p className="font-semibold text-slate-900">
+                        {employee.horasTrabalhadas}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-600 text-xs">Horas da Semana</p>
-                      <p className="font-semibold text-slate-900">{employee.horasSemanais}</p>
+                      <p className="font-semibold text-slate-900">
+                        {employee.horasSemanais}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-600 text-xs">Tempo de Pausa</p>
-                      <p className="font-semibold text-slate-900">{employee.horasPausa}</p>
+                      <p className="font-semibold text-slate-900">
+                        {employee.horasPausa}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-600 text-xs">Última Entrada/Saída</p>
                       <p className="font-semibold text-slate-900">
-                        {employee.ultimaEntrada} / {employee.ultimaSaida}
+                        {employee.ultimaEntrada ?? "-"} / {employee.ultimaSaida ?? "-"}
                       </p>
                     </div>
                   </div>
@@ -302,24 +393,30 @@ export function EmployeeTimeRecords() {
                     Histórico do Dia ({employee.entradas.length})
                   </p>
 
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {employee.entradas.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50"
-                      >
-                        {getEntryIcon(entry.type)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-700">
-                            {getEntryLabel(entry.type)}
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {entry.timestamp}
-                          </p>
+                  {employee.entradas.length === 0 ? (
+                    <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-600">
+                      Nenhum registro de ponto neste dia.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {employee.entradas.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50"
+                        >
+                          {getEntryIcon(entry.type)}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-slate-700">
+                              {getEntryLabel(entry.type)}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {entry.timestamp}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
