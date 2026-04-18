@@ -5,74 +5,39 @@ import {
   Get,
   Param,
   Post,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { PontoService } from './ponto.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-/**
- * Tipo para o corpo da requisição de registro de ponto
- * Define os dados esperados ao registrar entrada/saída
- */
-type RegistrarPontoBody = {
-  funcionarioId: number | string;  // ID do funcionário (pode vir como string do frontend)
-  tipo: string;                     // Tipo de ponto: 'entrada' ou 'saída'
-  latitude?: number | string;       // Coordenada de latitude (opcional)
-  longitude?: number | string;      // Coordenada de longitude (opcional)
-  accuracy?: number | string;       // Precisão da localização em metros (opcional)
-};
+function sanitizeFilename(filename: string) {
+  return filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9.-]/g, '_');
+}
 
-/**
- * Controlador de Ponto (PontoController)
- * 
- * Responsabilidades:
- * - Validar requisições de registro de ponto
- * - Converter tipos de dados (string para number)
- * - Delegar operações ao PontoService
- * - Retornar respostas ao cliente
- * 
- * Endpoints:
- * POST   /ponto/registrar - Registra entrada/saída de funcionário
- * GET    /ponto/:funcionarioId - Lista pontos de um funcionário
- */
 @Controller('ponto')
 export class PontoController {
   constructor(private readonly pontoService: PontoService) {}
 
-  /**
-   * Registra um ponto (entrada ou saída) para um funcionário
-   * @param body - Dados do ponto a registrar (funcionarioId, tipo, coordenadas)
-   * @returns Resultado do registro no banco de dados
-   * @throws BadRequestException - Se dados obrigatórios estiverem ausentes ou inválidos
-   */
   @Post('registrar')
-  registrar(
-    @Body()
-    body: {
-      funcionarioId: number;      // ID do funcionário que está registrando
-      tipo: string;                // 'entrada' ou 'saída'
-      latitude?: number;           // Latitude da localização (opcional)
-      longitude?: number;          // Longitude da localização (opcional)
-      accuracy?: number;           // Precisão do GPS em metros (opcional)
-    },
-  ) {
-    // Log para debug - registra a requisição recebida
-    console.log('=== POST /ponto/registrar ===');
-    console.log('BODY PONTO:', body);
-
-    // Converte funcionarioId para número (pode vir como string do frontend)
+  registrar(@Body() body: any) {
     const funcionarioId = Number(body.funcionarioId);
-    // Converte latitude para número, ou undefined se não fornecida
     const latitude = body.latitude != null ? Number(body.latitude) : undefined;
-    // Converte longitude para número, ou undefined se não fornecida
     const longitude = body.longitude != null ? Number(body.longitude) : undefined;
-    // Converte accuracy para número, ou undefined se não fornecida
     const accuracy = body.accuracy != null ? Number(body.accuracy) : undefined;
 
-    // Validação: Verifica se tipo foi fornecido e se funcionarioId é um número válido
     if (!body.tipo || Number.isNaN(funcionarioId)) {
       throw new BadRequestException('funcionarioId ou tipo inválido');
     }
 
-    // Delega o registro do ponto para o serviço
     return this.pontoService.registrarPonto(
       funcionarioId,
       body.tipo,
@@ -82,27 +47,76 @@ export class PontoController {
     );
   }
 
-  /**
-   * Lista todos os pontos registrados de um funcionário
-   * @param funcionarioId - ID do funcionário (obtido da URL)
-   * @returns Array com histórico de pontos do funcionário
-   * @throws BadRequestException - Se funcionarioId não for um número válido
-   */
   @Get(':funcionarioId')
   listar(@Param('funcionarioId') funcionarioId: string) {
-    // Log para debug - registra a requisição recebida
-    console.log('=== GET /ponto/:funcionarioId ===');
-    console.log('PARAM PONTO:', funcionarioId);
-
-    // Converte o ID do parâmetro para número
     const id = Number(funcionarioId);
 
-    // Validação: Verifica se o ID é um número válido
     if (Number.isNaN(id)) {
       throw new BadRequestException('funcionarioId inválido');
     }
 
-    // Delega a busca dos pontos para o serviço
     return this.pontoService.listarPontos(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/horas-extras')
+  async obterHorasExtras(@Req() req: any) {
+    return this.pontoService.obterHorasExtrasFuncionario(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/advertencias')
+  async listarAdvertencias(@Req() req: any) {
+    return this.pontoService.listarAdvertenciasFuncionario(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/atestados')
+  async listarAtestados(@Req() req: any) {
+    return this.pontoService.listarAtestadosFuncionario(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/atestados')
+  @UseInterceptors(
+    FileInterceptor('arquivo', {
+      storage: diskStorage({
+        destination: './uploads/atestados',
+        filename: (_req, file, callback) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          const extension = extname(file.originalname);
+          const baseName = sanitizeFilename(file.originalname.replace(extension, ''));
+          callback(null, `${baseName}-${uniqueSuffix}${extension}`);
+        },
+      }),
+      fileFilter: (_req, file, callback) => {
+        const allowed = [
+          'application/pdf',
+          'image/png',
+          'image/jpeg',
+          'image/jpg',
+          'image/webp',
+        ];
+
+        if (!allowed.includes(file.mimetype)) {
+          return callback(
+            new BadRequestException('Envie um arquivo PDF, PNG, JPG ou WEBP.'),
+            false,
+          );
+        }
+
+        callback(null, true);
+      },
+      limits: {
+        fileSize: 8 * 1024 * 1024,
+      },
+    }),
+  )
+  async enviarAtestado(
+    @Req() req: any,
+    @UploadedFile() arquivo: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    return this.pontoService.enviarAtestado(req.user, body, arquivo);
   }
 }

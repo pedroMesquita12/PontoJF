@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { EmployeeCertificates } from "./EmployeeCertificates";
+import { EmployeeOvertime } from "./EmployeeOvertime";
+import { EmployeeWarnings } from "./EmployeeWarnings";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -549,276 +553,185 @@ export function TimeClockApp({
     }
   };
 
-  return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        {!hideHeader && (
+return (
+  <div className="min-h-screen p-4 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6">
+
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-blue-600 p-3 text-white">
+              <Package className="size-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Express Encomendas
+              </h1>
+              <p className="text-sm text-slate-600">
+                Sistema de Ponto Eletrônico
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {getStatusBadge()}
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-red-600 text-red-600 hover:bg-red-50"
+                >
+                  <Power className="mr-2 size-4" />
+                  Sair
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Confirmar saída do sistema
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja sair do sistema?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={onLogout}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Sim, sair
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+
+      {/* CARD USUÁRIO */}
+      <Card>
+        <CardContent className="p-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-600 p-3 text-white">
-                <Package className="size-6" />
+            <div className="flex items-center gap-4">
+              <div className="rounded-full bg-slate-200 p-3">
+                <User className="size-8 text-slate-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                  Express Encomendas
-                </h1>
-                <p className="text-sm text-slate-600">
-                  Sistema de Ponto Eletrônico
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {userData.nome}
+                </h2>
+                <p className="text-slate-600">
+                  {userData.cargo} • Matrícula: {userData.matricula}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {getStatusBadge()}
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-red-600 text-red-600 hover:bg-red-50"
-                  >
-                    <Power className="mr-2 size-4" />
-                    Sair
-                  </Button>
-                </AlertDialogTrigger>
-
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Confirmar saída do sistema
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tem certeza que deseja sair do sistema? Você precisará
-                      fazer login novamente para acessar.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={onLogout}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      Sim, sair
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+            <div className="text-right">
+              <div className="mb-1 flex items-center gap-2 text-slate-600">
+                <Calendar className="size-4" />
+                <span className="text-sm">{formatDate(currentTime)}</span>
+              </div>
+              <div className="flex items-center gap-2 text-blue-600">
+                <Package className="size-4" />
+                <span className="text-sm font-medium">
+                  {deliveriesToday} entregas hoje
+                </span>
+              </div>
             </div>
           </div>
-        )}
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="rounded-full bg-slate-200 p-3">
-                  <User className="size-8 text-slate-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    {userData.nome}
-                  </h2>
-                  <p className="text-slate-600">
-                    {userData.cargo} • Matrícula: {userData.matricula}
-                  </p>
-                </div>
-              </div>
+      <Tabs defaultValue="registro" className="space-y-6">
 
-              <div className="text-right">
-                <div className="mb-1 flex items-center gap-2 text-slate-600">
-                  <Calendar className="size-4" />
-                  <span className="text-sm">{formatDate(currentTime)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-600">
-                  <Package className="size-4" />
-                  <span className="text-sm font-medium">
-                    {deliveriesToday} entregas hoje
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsList className="grid w-full grid-cols-4 rounded-xl bg-slate-100 p-1">
+          <TabsTrigger value="registro">Registrar Ponto</TabsTrigger>
+          <TabsTrigger value="atestados">Atestados</TabsTrigger>
+          <TabsTrigger value="extras">Horas Extras</TabsTrigger>
+          <TabsTrigger value="advertencias">Advertências</TabsTrigger>
+        </TabsList>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="size-5" />
-                Relógio
-              </CardTitle>
-            </CardHeader>
+        {/* ABA PRINCIPAL */}
+        <TabsContent value="registro">
+          <div className="grid gap-6 md:grid-cols-2">
 
-            <CardContent className="space-y-6">
-              <motion.div
-                className="text-center"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="mb-2 font-mono text-6xl font-bold text-slate-900">
-                  {formatTime(currentTime)}
-                </div>
-                <div className="text-slate-600">{formatDate(currentTime)}</div>
-              </motion.div>
+            {/* RELÓGIO */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="size-5" />
+                  Relógio
+                </CardTitle>
+              </CardHeader>
 
-              <Separator />
+              <CardContent className="space-y-6">
+                <motion.div className="text-center">
+                  <div className="mb-2 font-mono text-6xl font-bold text-slate-900">
+                    {formatTime(currentTime)}
+                  </div>
+                  <div className="text-slate-600">
+                    {formatDate(currentTime)}
+                  </div>
+                </motion.div>
 
-              <div className="space-y-3">
-                <AnimatePresence mode="wait">
+                <Separator />
+
+                <div className="space-y-3">
                   {workStatus === "fora" && (
-                    <motion.div
-                      key="clock-in"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                    >
-                      <Button
-                        onClick={handleClockIn}
-                        disabled={isSubmitting}
-                        className="h-14 w-full bg-green-600 text-lg hover:bg-green-700"
-                      >
-                        <LogIn className="mr-2 size-5" />
-                        {isSubmitting ? "Registrando..." : "Registrar Entrada"}
-                      </Button>
-                    </motion.div>
+                    <Button onClick={handleClockIn} className="h-14 w-full bg-green-600 text-lg">
+                      Registrar Entrada
+                    </Button>
                   )}
 
                   {workStatus === "trabalhando" && (
-                    <motion.div
-                      key="working"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-3"
-                    >
-                      <Button
-                        onClick={handlePauseStart}
-                        disabled={isSubmitting}
-                        className="h-14 w-full bg-yellow-500 text-lg hover:bg-yellow-600"
-                      >
-                        <Coffee className="mr-2 size-5" />
-                        {isSubmitting ? "Registrando..." : "Iniciar Pausa"}
+                    <>
+                      <Button onClick={handlePauseStart} className="h-14 w-full bg-yellow-500 text-lg">
+                        Pausa
                       </Button>
-                      <Button
-                        onClick={handleClockOut}
-                        disabled={isSubmitting}
-                        variant="outline"
-                        className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
-                      >
-                        <LogOut className="mr-2 size-5" />
-                        {isSubmitting ? "Registrando..." : "Registrar Saída"}
+                      <Button onClick={handleClockOut} className="h-14 w-full border-red-600 text-lg">
+                        Saída
                       </Button>
-                    </motion.div>
-                  )}
-
-                  {workStatus === "pausa" && (
-                    <motion.div
-                      key="pause"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-3"
-                    >
-                      <Button
-                        onClick={handlePauseEnd}
-                        disabled={isSubmitting}
-                        className="h-14 w-full bg-blue-600 text-lg hover:bg-blue-700"
-                      >
-                        <CheckCircle2 className="mr-2 size-5" />
-                        {isSubmitting ? "Registrando..." : "Finalizar Pausa"}
-                      </Button>
-                      <Button
-                        onClick={handleClockOut}
-                        disabled={isSubmitting}
-                        variant="outline"
-                        className="h-14 w-full border-red-600 text-lg text-red-600 hover:bg-red-50"
-                      >
-                        <LogOut className="mr-2 size-5" />
-                        {isSubmitting ? "Registrando..." : "Registrar Saída"}
-                      </Button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Timer className="size-5" />
-                Resumo do Dia
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <div className="mb-1 text-sm text-green-700">
-                    Tempo Trabalhado
-                  </div>
-                  <div className="font-mono text-2xl font-bold text-green-900">
-                    {formatDuration(workedTime)}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-                  <div className="mb-1 text-sm text-yellow-700">
-                    Tempo de Pausa
-                  </div>
-                  <div className="font-mono text-2xl font-bold text-yellow-900">
-                    {formatDuration(pauseTime)}
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="mb-3 font-semibold text-slate-900">
-                  Histórico de Hoje
-                </h3>
-
-                <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {isLoadingEntries ? (
-                    <div className="py-8 text-center text-slate-500">
-                      <p>Carregando registros...</p>
-                    </div>
-                  ) : timeEntries.length === 0 ? (
-                    <div className="py-8 text-center text-slate-500">
-                      <Clock className="mx-auto mb-2 size-12 opacity-50" />
-                      <p>Nenhum registro hoje</p>
-                    </div>
-                  ) : (
-                    timeEntries.map((entry) => (
-                      <motion.div
-                        key={entry.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
-                      >
-                        <div className="flex items-center gap-3">
-                          {getEntryIcon(entry.type)}
-                          <span className="font-medium text-slate-900">
-                            {getEntryLabel(entry.type)}
-                          </span>
-                        </div>
-
-                        <span className="font-mono text-sm text-slate-600">
-                          {formatTime(entry.timestamp)}
-                        </span>
-                      </motion.div>
-                    ))
+                    </>
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              </CardContent>
+            </Card>
+
+            {/* RESUMO */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resumo do Dia</CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p>Tempo Trabalhado: {formatDuration(workedTime)}</p>
+                <p>Tempo Pausa: {formatDuration(pauseTime)}</p>
+              </CardContent>
+            </Card>
+
+          </div>
+        </TabsContent>
+
+        {/* NOVAS TELAS */}
+        <TabsContent value="atestados">
+          <EmployeeCertificates />
+        </TabsContent>
+
+        <TabsContent value="extras">
+          <EmployeeOvertime />
+        </TabsContent>
+
+        <TabsContent value="advertencias">
+          <EmployeeWarnings />
+        </TabsContent>
+
+      </Tabs>
     </div>
-  );
+  </div>
+);
 }
