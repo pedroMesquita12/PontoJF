@@ -1,3 +1,6 @@
+
+
+
 # LogiControl
 
 Plataforma de Gestão Operacional e Controle de Ponto
@@ -11,13 +14,8 @@ Plataforma de Gestão Operacional e Controle de Ponto
 
 ---
 
-## Demonstração
 
-![Demo do Sistema](https://via.placeholder.com/900x500?text=Demo+LogiControl)
 
-> Substitua esse link por um GIF real do seu sistema (posso te ensinar a gravar se quiser)
-
----
 
 ## Sobre o Projeto
 
