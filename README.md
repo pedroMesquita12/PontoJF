@@ -1,97 +1,71 @@
 # LogiControl
-### Plataforma de Gestão Operacional e Controle de Ponto
+
+Plataforma de Gestão Operacional e Controle de Ponto
+
+Versão: 1.0.0
 
 ---
 
-##  Visão Geral
+## Sobre o Projeto
 
-O **LogiControl** é uma plataforma corporativa voltada para a gestão integrada de operações internas, com foco em controle de ponto eletrônico, monitoramento de colaboradores e rastreamento de pacotes logísticos.
+O LogiControl é uma plataforma web desenvolvida para gestão operacional de empresas, com foco em controle de ponto eletrônico, monitoramento de colaboradores e rastreamento de pacotes logísticos.
 
-A solução foi desenvolvida para atender ambientes que exigem **controle rigoroso, rastreabilidade e visibilidade em tempo real**, proporcionando maior eficiência operacional e suporte à tomada de decisões estratégicas.
-
----
-
-##  Objetivo do Produto
-
-Centralizar e automatizar processos operacionais críticos, reduzindo erros manuais, aumentando a produtividade e garantindo maior transparência nas atividades da organização.
+A solução tem como objetivo aumentar a eficiência operacional, garantir rastreabilidade das atividades e fornecer dados estratégicos para apoio à tomada de decisão.
 
 ---
 
-##  Principais Módulos
+## Funcionalidades Principais
 
-###  Controle de Ponto
-- Registro eletrônico de jornada (entrada, saída e pausas)
+### Controle de Ponto
+- Registro de entrada, saída e pausas
 - Cálculo automático de horas trabalhadas
-- Status operacional em tempo real dos colaboradores
+- Status em tempo real
 - Histórico completo por data
 
----
+### Painel Administrativo
+- Visão geral da operação
+- Monitoramento em tempo real
+- Indicadores de desempenho
+- Controle de usuários e permissões
 
-### 👨‍💼 Painel Administrativo
-- Visão consolidada da operação
-- Monitoramento em tempo real dos colaboradores
-- Indicadores operacionais e de desempenho
-- Controle de acesso por perfil
+### Gestão de Pacotes
+- Registro de entrada e saída
+- Rastreamento por código
+- Associação automática ao operador
+- Histórico detalhado
 
----
-
-###  Gestão de Pacotes
-- Registro de movimentação (entrada/saída)
-- Rastreamento de pacotes por código
-- Associação automática com operador responsável
-- Histórico detalhado de operações logísticas
-
----
-
-###  Relatórios e Indicadores
-- Relatórios operacionais detalhados
+### Relatórios e Indicadores
+- Relatórios operacionais
 - Análise de produtividade
-- Consolidação de dados para tomada de decisão
+- Dados consolidados
+- Exportação de relatórios
 
 ---
 
-##  Segurança e Controle de Acesso
-
-O sistema utiliza autenticação baseada em tokens (JWT), garantindo segurança e controle de permissões.
-
-Perfis disponíveis:
-- **Administrador (DONO):** acesso completo ao sistema
-- **Colaborador:** acesso restrito às funcionalidades operacionais
-
----
-
-##  Arquitetura da Solução
-
-A aplicação segue uma arquitetura moderna baseada em separação de responsabilidades:
-
-- **Frontend:** Interface web responsiva e reativa
-- **Backend:** API REST estruturada e segura
-- **Banco de Dados:** Persistência relacional otimizada
-
----
-
-##  Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 ### Frontend
-- :contentReference[oaicite:0]{index=0}
-- :contentReference[oaicite:1]{index=1}
-- :contentReference[oaicite:2]{index=2}
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
 
 ### Backend
-- :contentReference[oaicite:3]{index=3}
-- :contentReference[oaicite:4]{index=4}
+- NestJS
+- TypeScript
+- Prisma ORM
 
 ### Banco de Dados
-- :contentReference[oaicite:5]{index=5}
-- :contentReference[oaicite:6]{index=6}
+- PostgreSQL
+- Supabase
 
 ### Infraestrutura e Deploy
-- :contentReference[oaicite:7]{index=7}
-- :contentReference[oaicite:8]{index=8}
+- Vercel (Frontend)
+- Railway (Backend)
 
 ---
 
-##  Estrutura do Projeto
+## Estrutura do Projeto
 
 
 logiControl/
@@ -111,59 +85,59 @@ logiControl/
 
 ---
 
-##  Instalação e Execução
+## Instalação e Execução
 
 ### Pré-requisitos
-- Node.js 18+
-- Gerenciador de pacotes (npm ou yarn)
+- Node.js 18 ou superior
+- npm ou yarn
 
 ---
 
-###  Backend
+### Backend
 
 ```bash
 cd backend
 npm install
 npm run start:dev
 
- Frontend
+Frontend
 cd frontend
 npm install
 npm run dev
 
- Configuração de Ambiente
+Configuração de Ambiente
+
 Backend (.env)
 DATABASE_URL=
 JWT_SECRET=
 PORT=3000
+
 Frontend (.env)
 VITE_API_URL=
 
- Fluxo Operacional Simplificado
-Usuário realiza autenticação no sistema
-Sistema valida credenciais e gera token JWT
-Operações são realizadas com base no perfil do usuário
-Todas as ações são registradas e vinculadas ao usuário autenticado
-Dados são disponibilizados em tempo real no painel administrativo
+Fluxo Operacional
+Usuário realiza login no sistema
+O backend valida as credenciais
+Um token JWT é gerado
+Todas as ações são vinculadas ao usuário autenticado
+Os dados são exibidos em tempo real no painel administrativo
 
- Diferenciais da Solução
-Arquitetura escalável e modular
-Registro automático de responsabilidade operacional
-Monitoramento em tempo real
-Redução de erros humanos
-Integração entre controle de ponto e logística
+Segurança
+Autenticação baseada em JWT
+Controle de acesso por perfil
+Proteção de rotas no backend
 
- Roadmap (Evolução do Produto)
-Integração com leitores de código de barras
-Implementação de WebSockets para atualização em tempo real
+Roadmap
+Integração com leitor de código de barras
+Atualização em tempo real com WebSockets
 Dashboard analítico avançado
-Sistema de notificações automáticas
+Sistema de notificações
 Controle de estoque integrado
 
- Licença
+Licença
 
 Uso acadêmico e demonstração técnica.
 
- Desenvolvimento
+Autor
 
-Projeto desenvolvido por Pedro Mesquita, com foco em soluções modernas para gestão operacional e automação de processos empresariais.
+Pedro Mesquita
