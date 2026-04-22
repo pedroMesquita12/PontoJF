@@ -177,11 +177,11 @@ Backend: https://pontojf-production.up.railway.app
 ```
 #### Roadmap
 
-Integração com leitor de código de barras
-Atualização em tempo real com WebSockets
-Dashboard analítico avançado
-Sistema de notificações
-Controle de estoque integrado
+- Integração com leitor de código de barras
+- Atualização em tempo real com WebSockets
+- Dashboard analítico avançado
+- Sistema de notificações
+- Controle de estoque integrado
 
 ---
 
