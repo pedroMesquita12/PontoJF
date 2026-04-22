@@ -48,7 +48,7 @@ A solução tem como objetivo aumentar a eficiência operacional, garantir rastr
 ---
 
 ## Estrutura do Projeto
-
+```
 
 logiControl/
 │
