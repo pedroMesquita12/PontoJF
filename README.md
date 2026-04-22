@@ -1,58 +1,169 @@
- Sistema de Ponto e Gestão Operacional
+# LogiControl
+### Plataforma de Gestão Operacional e Controle de Ponto
 
-Este projeto é um sistema web completo para controle de ponto eletrônico e gestão operacional de uma agência, integrando registro de jornada dos funcionários, movimentação de pacotes e acompanhamento de relatórios de orçamento em uma única plataforma.
+---
 
-A aplicação foi construída com React + Vite + Tailwind no frontend, NestJS no backend e Prisma ORM com PostgreSQL (Supabase) para persistência dos dados, garantindo uma arquitetura moderna, escalável e organizada.
+##  Visão Geral
 
- Visão Geral
+O **LogiControl** é uma plataforma corporativa voltada para a gestão integrada de operações internas, com foco em controle de ponto eletrônico, monitoramento de colaboradores e rastreamento de pacotes logísticos.
 
-O sistema permite que funcionários registrem seus horários de trabalho de forma simples, enquanto a administração acompanha em tempo real a operação da empresa. Além do controle de ponto, o sistema também contempla o fluxo de entrada e saída de pacotes da agência, bem como a visualização de relatórios relacionados a orçamentos e desempenho operacional.
+A solução foi desenvolvida para atender ambientes que exigem **controle rigoroso, rastreabilidade e visibilidade em tempo real**, proporcionando maior eficiência operacional e suporte à tomada de decisões estratégicas.
 
-No login, o usuário é automaticamente direcionado conforme seu nível de acesso. Perfis administrativos têm acesso a um painel completo de gestão, enquanto usuários comuns acessam apenas seu dashboard individual.
+---
 
- Funcionalidades
+##  Objetivo do Produto
 
-No módulo de ponto, os funcionários podem registrar eventos como entrada, saída para almoço, retorno e saída final. O sistema interpreta esses registros para determinar automaticamente o status atual de cada funcionário (trabalhando, em pausa ou fora), além de calcular horas trabalhadas, tempo de pausa e jornada semanal.
+Centralizar e automatizar processos operacionais críticos, reduzindo erros manuais, aumentando a produtividade e garantindo maior transparência nas atividades da organização.
 
-Para a administração, existe um painel que centraliza todas essas informações em tempo real, exibindo o histórico diário de cada funcionário e indicadores consolidados como presença, produtividade e distribuição de horas.
+---
 
-Além disso, o sistema inclui um controle operacional da agência, permitindo o acompanhamento da entrada e saída de pacotes. Essa funcionalidade possibilita registrar movimentações, acompanhar fluxo logístico e manter visibilidade sobre a operação diária.
+##  Principais Módulos
 
-Outro ponto importante é a área de relatórios, onde são exibidos dados relacionados a orçamentos e desempenho. Esses relatórios permitem uma visão mais estratégica do negócio, auxiliando na análise de produtividade, volume de operações e tomada de decisão.
+###  Controle de Ponto
+- Registro eletrônico de jornada (entrada, saída e pausas)
+- Cálculo automático de horas trabalhadas
+- Status operacional em tempo real dos colaboradores
+- Histórico completo por data
 
- Regras de Funcionamento
+---
 
-O status do funcionário é determinado automaticamente com base no último registro realizado no dia. Registros de entrada ou retorno indicam que o funcionário está trabalhando, enquanto saídas para almoço indicam pausa e a saída final indica que o expediente foi encerrado.
+### 👨‍💼 Painel Administrativo
+- Visão consolidada da operação
+- Monitoramento em tempo real dos colaboradores
+- Indicadores operacionais e de desempenho
+- Controle de acesso por perfil
 
-Internamente, os tipos de registro são padronizados e mapeados entre backend e frontend, garantindo consistência na exibição dos dados e no cálculo das métricas.
+---
 
- Integração e API
+###  Gestão de Pacotes
+- Registro de movimentação (entrada/saída)
+- Rastreamento de pacotes por código
+- Associação automática com operador responsável
+- Histórico detalhado de operações logísticas
 
-O backend expõe endpoints responsáveis tanto pela autenticação quanto pela gestão administrativa. Entre eles, destacam-se os endpoints que retornam os registros de ponto dos funcionários e o overview geral do sistema, utilizado para alimentar os dashboards com dados reais.
+---
 
- Arquitetura
+###  Relatórios e Indicadores
+- Relatórios operacionais detalhados
+- Análise de produtividade
+- Consolidação de dados para tomada de decisão
 
-O projeto segue uma separação clara entre frontend e backend. No backend, os módulos são organizados por domínio (como autenticação, funcionários, ponto e administração), enquanto o frontend utiliza componentes reutilizáveis e páginas estruturadas para cada área do sistema.
+---
 
-A comunicação entre as camadas é feita via API REST, com tratamento de dados no backend e renderização dinâmica no frontend.
+##  Segurança e Controle de Acesso
 
- Execução do Projeto
+O sistema utiliza autenticação baseada em tokens (JWT), garantindo segurança e controle de permissões.
 
-Para rodar o projeto localmente, basta instalar as dependências em cada parte da aplicação e iniciar os servidores de desenvolvimento:
+Perfis disponíveis:
+- **Administrador (DONO):** acesso completo ao sistema
+- **Colaborador:** acesso restrito às funcionalidades operacionais
 
-# Backend
+---
+
+##  Arquitetura da Solução
+
+A aplicação segue uma arquitetura moderna baseada em separação de responsabilidades:
+
+- **Frontend:** Interface web responsiva e reativa
+- **Backend:** API REST estruturada e segura
+- **Banco de Dados:** Persistência relacional otimizada
+
+---
+
+##  Tecnologias Utilizadas
+
+### Frontend
+- :contentReference[oaicite:0]{index=0}
+- :contentReference[oaicite:1]{index=1}
+- :contentReference[oaicite:2]{index=2}
+
+### Backend
+- :contentReference[oaicite:3]{index=3}
+- :contentReference[oaicite:4]{index=4}
+
+### Banco de Dados
+- :contentReference[oaicite:5]{index=5}
+- :contentReference[oaicite:6]{index=6}
+
+### Infraestrutura e Deploy
+- :contentReference[oaicite:7]{index=7}
+- :contentReference[oaicite:8]{index=8}
+
+---
+
+##  Estrutura do Projeto
+
+
+logiControl/
+│
+├── backend/
+│ ├── src/
+│ ├── prisma/
+│ └── modules/
+│
+├── frontend/
+│ ├── src/
+│ ├── components/
+│ └── pages/
+│
+└── README.md
+
+
+---
+
+##  Instalação e Execução
+
+### Pré-requisitos
+- Node.js 18+
+- Gerenciador de pacotes (npm ou yarn)
+
+---
+
+###  Backend
+
+```bash
 cd backend
 npm install
-npx prisma generate
 npm run start:dev
 
-# Frontend
+ Frontend
 cd frontend
 npm install
 npm run dev
 
- Status do Projeto
+ Configuração de Ambiente
+Backend (.env)
+DATABASE_URL=
+JWT_SECRET=
+PORT=3000
+Frontend (.env)
+VITE_API_URL=
 
-O sistema já conta com autenticação funcional, painel administrativo integrado ao banco de dados, controle completo de ponto com cálculo automático de jornada e uma base sólida para gestão operacional da agência, incluindo movimentação de pacotes e relatórios de orçamento.
+ Fluxo Operacional Simplificado
+Usuário realiza autenticação no sistema
+Sistema valida credenciais e gera token JWT
+Operações são realizadas com base no perfil do usuário
+Todas as ações são registradas e vinculadas ao usuário autenticado
+Dados são disponibilizados em tempo real no painel administrativo
 
-O projeto continua em evolução, com foco em melhorias de interface, novos relatórios e possíveis integrações externas.
+ Diferenciais da Solução
+Arquitetura escalável e modular
+Registro automático de responsabilidade operacional
+Monitoramento em tempo real
+Redução de erros humanos
+Integração entre controle de ponto e logística
+
+ Roadmap (Evolução do Produto)
+Integração com leitores de código de barras
+Implementação de WebSockets para atualização em tempo real
+Dashboard analítico avançado
+Sistema de notificações automáticas
+Controle de estoque integrado
+
+ Licença
+
+Uso acadêmico e demonstração técnica.
+
+ Desenvolvimento
+
+Projeto desenvolvido por Pedro Mesquita, com foco em soluções modernas para gestão operacional e automação de processos empresariais.
