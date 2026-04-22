@@ -2,7 +2,20 @@
 
 Plataforma de Gestão Operacional e Controle de Ponto
 
-Versão: 1.0.0
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+![Backend](https://img.shields.io/badge/backend-NestJS-red)
+![Frontend](https://img.shields.io/badge/frontend-React-blue)
+![Database](https://img.shields.io/badge/database-PostgreSQL-blue)
+![License](https://img.shields.io/badge/license-academic-lightgrey)
+
+---
+
+## Demonstração
+
+![Demo do Sistema](https://via.placeholder.com/900x500?text=Demo+LogiControl)
+
+> Substitua esse link por um GIF real do seu sistema (posso te ensinar a gravar se quiser)
 
 ---
 
@@ -16,52 +29,23 @@ A solução tem como objetivo aumentar a eficiência operacional, garantir rastr
 
 ## Funcionalidades Principais
 
-### Controle de Ponto
-- Registro de entrada, saída e pausas
-- Cálculo automático de horas trabalhadas
-- Status em tempo real
-- Histórico completo por data
-
-### Painel Administrativo
-- Visão geral da operação
-- Monitoramento em tempo real
-- Indicadores de desempenho
-- Controle de usuários e permissões
-
-### Gestão de Pacotes
-- Registro de entrada e saída
-- Rastreamento por código
-- Associação automática ao operador
-- Histórico detalhado
-
-### Relatórios e Indicadores
-- Relatórios operacionais
-- Análise de produtividade
-- Dados consolidados
-- Exportação de relatórios
+| Controle de Ponto | Painel Administrativo | Gestão de Pacotes | Relatórios e Indicadores |
+|------------------|----------------------|------------------|--------------------------|
+| Registro de entrada, saída e pausas | Visão geral da operação | Registro de entrada e saída | Relatórios operacionais |
+| Cálculo automático de horas | Monitoramento em tempo real | Rastreamento por código | Análise de produtividade |
+| Status em tempo real | Indicadores de desempenho | Associação automática ao operador | Dados consolidados |
+| Histórico por data | Controle de usuários | Histórico detalhado | Exportação de relatórios |
 
 ---
 
 ## Tecnologias Utilizadas
 
-### Frontend
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-
-### Backend
-- NestJS
-- TypeScript
-- Prisma ORM
-
-### Banco de Dados
-- PostgreSQL
-- Supabase
-
-### Infraestrutura e Deploy
-- Vercel (Frontend)
-- Railway (Backend)
+| Frontend | Backend | Banco de Dados | Infraestrutura |
+|----------|--------|----------------|----------------|
+| React | NestJS | PostgreSQL | Vercel |
+| TypeScript | TypeScript | Supabase | Railway |
+| Vite | Prisma ORM |  |  |
+| Tailwind CSS |  |  |  |
 
 ---
 
@@ -95,38 +79,103 @@ logiControl/
 
 ### Backend
 
-```bash
-Backend
+
 cd backend
 npm install
 npm run start:dev
 
-Frontend
+
+---
+
+### Frontend
+
+
 cd frontend
 npm install
 npm run dev
 
-Configuração de Ambiente
 
-Backend (.env)
+---
+
+## Configuração de Ambiente
+
+### Backend (.env)
+
+
 DATABASE_URL=
 JWT_SECRET=
 PORT=3000
 
-Frontend (.env)
+
+---
+
+### Frontend (.env)
+
+
 VITE_API_URL=
 
+
+---
+
+## API (Documentação)
+
+A API segue padrão REST e pode ser documentada via Swagger.
+
+### Endpoints principais:
+
+#### Autenticação
+
+POST /auth/login
+
+
+#### Admin
+
+GET /admin/overview
+GET /admin/ponto/funcionarios
+
+
+#### Pacotes
+
+POST /pacotes
+GET /pacotes
+
+
+---
+
+### Swagger (Recomendado)
+
+Se quiser ativar no NestJS:
+
+```ts
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+const config = new DocumentBuilder()
+  .setTitle('LogiControl API')
+  .setDescription('Documentação da API')
+  .setVersion('1.0')
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup('api', app, document);
+
+Acesse em:
+
+http://localhost:3000/api
 Fluxo Operacional
 Usuário realiza login no sistema
 O backend valida as credenciais
 Um token JWT é gerado
 Todas as ações são vinculadas ao usuário autenticado
 Os dados são exibidos em tempo real no painel administrativo
-
 Segurança
 Autenticação baseada em JWT
 Controle de acesso por perfil
 Proteção de rotas no backend
+Deploy
+
+Frontend: https://logicontrol-weld.vercel.app/
+
+Backend: https://pontojf-production.up.railway.app
 
 Roadmap
 Integração com leitor de código de barras
@@ -134,7 +183,6 @@ Atualização em tempo real com WebSockets
 Dashboard analítico avançado
 Sistema de notificações
 Controle de estoque integrado
-
 Licença
 
 Uso acadêmico e demonstração técnica.
