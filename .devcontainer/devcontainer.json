@@ -1,11 +1,21 @@
 {
-  "name": "PontoJF Dev",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "name": "LogiControl Dev",
+
+
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+
   "features": {
+
+    "ghcr.io/devcontainers/features/docker-in-docker:2.16.1": {
+      "moby": false
+    },
+
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
+
   "forwardPorts": [3000, 5173, 5555],
+
   "portsAttributes": {
     "3000": {
       "label": "Backend NestJS",
@@ -23,7 +33,10 @@
       "visibility": "private"
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+
+   "postCreateCommand": "bash .devcontainer/setup.sh",
+
   "customizations": {
     "vscode": {
       "settings": {
@@ -51,5 +64,6 @@
       ]
     }
   },
+
   "remoteUser": "node"
 }
