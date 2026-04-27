@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Search,
-  MapPin,
   Download,
   Filter,
   Upload,
@@ -100,7 +99,7 @@ async function apiFetch(url: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     throw new Error(
-      data?.message || data || `Erro ${response.status} ao acessar ${url}`,
+      data?.message || data || `Erro ${response.status} ao acessar ${url}`
     );
   }
 
@@ -125,17 +124,12 @@ function StatCard({
   return (
     <div className="rounded-3xl border border-[#e9ebf3] bg-white p-6 shadow-sm">
       <div className="flex items-start gap-4">
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-full ${iconClassName}`}
-        >
+        <div className={`flex h-14 w-14 items-center justify-center rounded-full ${iconClassName}`}>
           {icon}
         </div>
-
         <div>
           <p className="text-sm text-[#7b82a8]">{title}</p>
-          <h3
-            className={`mt-1 text-4xl font-bold tracking-tight ${valueClassName}`}
-          >
+          <h3 className={`mt-1 text-3xl font-bold tracking-tight xl:text-4xl ${valueClassName}`}>
             {value}
           </h3>
           <p className="mt-1 text-sm text-[#9aa1bf]">{subtitle}</p>
@@ -162,12 +156,8 @@ export default function DeliveryReports() {
   const [erro, setErro] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const [arquivosSelecionados, setArquivosSelecionados] = useState<string[]>(
-    [],
-  );
-  const [entregasSelecionadas, setEntregasSelecionadas] = useState<string[]>(
-    [],
-  );
+  const [arquivosSelecionados, setArquivosSelecionados] = useState<string[]>([]);
+  const [entregasSelecionadas, setEntregasSelecionadas] = useState<string[]>([]);
 
   let usuario: any = null;
 
@@ -179,23 +169,19 @@ export default function DeliveryReports() {
   }
 
   const usuarioId = usuario?.id || usuario?.usuarioId || 1;
-
   const entregas = useMemo(() => dados?.entregas ?? [], [dados]);
 
   const arquivosUnicos = useMemo(() => {
     const set = new Set<string>();
 
     entregas.forEach((e) => {
-      if (e.origemArquivo) {
-        set.add(e.origemArquivo);
-      }
+      if (e.origemArquivo) set.add(e.origemArquivo);
     });
 
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [entregas]);
 
-  const planilhaAtiva =
-    arquivosUnicos[0] || arquivo?.name || "Nenhuma planilha importada";
+  const planilhaAtiva = arquivosUnicos[0] || arquivo?.name || "Nenhuma planilha importada";
 
   async function carregarCidades() {
     try {
@@ -212,7 +198,6 @@ export default function DeliveryReports() {
       setErro("");
 
       const params = new URLSearchParams();
-
       if (cidade) params.append("cidade", cidade);
       if (status) params.append("status", status);
       if (dataInicio) params.append("dataInicio", dataInicio);
@@ -245,13 +230,13 @@ export default function DeliveryReports() {
 
   useEffect(() => {
     setArquivosSelecionados((prev) =>
-      prev.filter((nome) => arquivosUnicos.includes(nome)),
+      prev.filter((nome) => arquivosUnicos.includes(nome))
     );
   }, [arquivosUnicos]);
 
   useEffect(() => {
     setEntregasSelecionadas((prev) =>
-      prev.filter((id) => entregas.some((entrega) => entrega.id === id)),
+      prev.filter((id) => entregas.some((entrega) => entrega.id === id))
     );
   }, [entregas]);
 
@@ -274,19 +259,13 @@ export default function DeliveryReports() {
         {
           method: "POST",
           body: formData,
-        },
+        }
       );
 
-      setMensagem(
-        `Planilha importada com sucesso. ${data?.totalImportado ?? 0} registros adicionados.`,
-      );
-
+      setMensagem(`Planilha importada com sucesso. ${data?.totalImportado ?? 0} registros adicionados.`);
       setArquivo(null);
 
-      const input = document.getElementById(
-        "input-planilha",
-      ) as HTMLInputElement | null;
-
+      const input = document.getElementById("input-planilha") as HTMLInputElement | null;
       if (input) input.value = "";
 
       await carregarCidades();
@@ -309,15 +288,13 @@ export default function DeliveryReports() {
 
   function toggleArquivo(nome: string) {
     setArquivosSelecionados((prev) =>
-      prev.includes(nome)
-        ? prev.filter((item) => item !== nome)
-        : [...prev, nome],
+      prev.includes(nome) ? prev.filter((item) => item !== nome) : [...prev, nome]
     );
   }
 
   function toggleEntrega(id: string) {
     setEntregasSelecionadas((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   }
 
@@ -343,9 +320,8 @@ export default function DeliveryReports() {
 
     if (totalEntregas === 0 && totalArquivos === 0) {
       const confirmarTudo = window.confirm(
-        "Nenhum item foi selecionado. Deseja apagar TODOS os dados importados?",
+        "Nenhum item foi selecionado. Deseja apagar TODOS os dados importados?"
       );
-
       if (!confirmarTudo) return;
 
       try {
@@ -360,12 +336,10 @@ export default function DeliveryReports() {
         setMensagem(
           typeof data === "string"
             ? data
-            : data?.message || "Todos os dados foram removidos com sucesso.",
+            : data?.message || "Todos os dados foram removidos com sucesso."
         );
-
         setArquivosSelecionados([]);
         setEntregasSelecionadas([]);
-
         await carregarCidades();
         await carregarEntregas();
       } catch (err: any) {
@@ -379,14 +353,8 @@ export default function DeliveryReports() {
     }
 
     let texto = "Deseja apagar os itens selecionados?\n\n";
-
-    if (totalEntregas > 0) {
-      texto += `• ${totalEntregas} dado(s) específico(s)\n`;
-    }
-
-    if (totalArquivos > 0) {
-      texto += `• ${totalArquivos} planilha(s) selecionada(s)\n`;
-    }
+    if (totalEntregas > 0) texto += `• ${totalEntregas} dado(s) específico(s)\n`;
+    if (totalArquivos > 0) texto += `• ${totalArquivos} planilha(s) selecionada(s)\n`;
 
     const confirmar = window.confirm(texto);
     if (!confirmar) return;
@@ -399,25 +367,20 @@ export default function DeliveryReports() {
       if (totalEntregas > 0) {
         await apiFetch("/admin/relatorios/entregas/selecionadas", {
           method: "DELETE",
-          body: JSON.stringify({
-            ids: entregasSelecionadas,
-          }),
+          body: JSON.stringify({ ids: entregasSelecionadas }),
         });
       }
 
       if (totalArquivos > 0) {
         await apiFetch("/admin/relatorios/entregas/arquivos", {
           method: "DELETE",
-          body: JSON.stringify({
-            arquivos: arquivosSelecionados,
-          }),
+          body: JSON.stringify({ arquivos: arquivosSelecionados }),
         });
       }
 
       setMensagem("Itens selecionados removidos com sucesso.");
       setArquivosSelecionados([]);
       setEntregasSelecionadas([]);
-
       await carregarCidades();
       await carregarEntregas();
     } catch (err: any) {
@@ -432,69 +395,52 @@ export default function DeliveryReports() {
     try {
       setErro("");
       setMensagem("");
-
       const token = getToken();
 
       const body =
         entregasSelecionadas.length > 0
           ? { ids: entregasSelecionadas }
-          : {
-              cidade,
-              status,
-              dataInicio,
-              dataFim,
-              busca,
-            };
+          : { cidade, status, dataInicio, dataFim, busca };
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      if (token) headers.Authorization = `Bearer ${token}`;
 
-      const response = await fetch(
-        `${API_URL}/admin/relatorios/entregas/exportar`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(body),
-        },
-      );
+      const response = await fetch(`${API_URL}/admin/relatorios/entregas/exportar`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type") || "";
-
         if (contentType.includes("application/json")) {
           const erroData = await response.json();
           throw new Error(erroData?.message || "Erro ao exportar relatório.");
         }
-
         const erroTexto = await response.text();
         throw new Error(erroTexto || "Erro ao exportar relatório.");
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement("a");
       link.href = url;
-      link.download =
-        entregasSelecionadas.length > 0
-          ? "entregas-selecionadas.xlsx"
-          : "relatorio-entregas.xlsx";
+      link.download = entregasSelecionadas.length > 0
+        ? "entregas-selecionadas.xlsx"
+        : "relatorio-entregas.xlsx";
 
       document.body.appendChild(link);
       link.click();
       link.remove();
-
       window.URL.revokeObjectURL(url);
 
       setMensagem(
         entregasSelecionadas.length > 0
           ? "Registros selecionados exportados com sucesso."
-          : "Relatório exportado com sucesso.",
+          : "Relatório exportado com sucesso."
       );
     } catch (err: any) {
       console.error(err);
@@ -504,84 +450,53 @@ export default function DeliveryReports() {
 
   function formatarStatus(status: EntregaStatus) {
     switch (status) {
-      case "ENTREGUE":
-        return "Entregue";
-      case "EM_ROTA":
-        return "Em Rota";
-      case "PENDENTE":
-        return "Pendente";
-      case "CANCELADO":
-        return "Cancelado";
-      default:
-        return "Sem status";
+      case "ENTREGUE": return "Entregue";
+      case "EM_ROTA": return "Em Rota";
+      case "PENDENTE": return "Pendente";
+      case "CANCELADO": return "Cancelado";
+      default: return "Sem status";
     }
   }
 
   function getStatusClasses(status: EntregaStatus) {
     switch (status) {
-      case "ENTREGUE":
-        return "bg-green-100 text-green-700";
-      case "EM_ROTA":
-        return "bg-blue-100 text-blue-700";
-      case "PENDENTE":
-        return "bg-yellow-100 text-yellow-700";
-      case "CANCELADO":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-100 text-gray-700";
+      case "ENTREGUE": return "bg-green-100 text-green-700";
+      case "EM_ROTA": return "bg-blue-100 text-blue-700";
+      case "PENDENTE": return "bg-yellow-100 text-yellow-700";
+      case "CANCELADO": return "bg-red-100 text-red-700";
+      default: return "bg-gray-100 text-gray-700";
     }
   }
 
   function formatarData(data?: string | null) {
     if (!data) return "-";
-
     const date = new Date(data);
     if (Number.isNaN(date.getTime())) return "-";
-
     return date.toLocaleDateString("pt-BR");
   }
 
   function formatarHorario(data?: string | null) {
     if (!data) return "-";
-
     const date = new Date(data);
     if (Number.isNaN(date.getTime())) return "-";
-
     const iso = typeof data === "string" ? data : "";
-
     const ehDataSemHoraReal =
       iso.includes("T00:00:00") ||
       iso.includes("T00:00:00.000Z") ||
-      (date.getUTCHours() === 0 &&
-        date.getUTCMinutes() === 0 &&
-        date.getUTCSeconds() === 0);
-
-    if (ehDataSemHoraReal) {
-      return "-";
-    }
-
-    return date.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+      (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0);
+    if (ehDataSemHoraReal) return "-";
+    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   }
 
   function formatarValor(valor?: string | number | null) {
     if (valor === null || valor === undefined || valor === "") return "-";
-
     const numero = typeof valor === "number" ? valor : Number(valor);
-
     if (Number.isNaN(numero)) return String(valor);
-
-    return numero.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
+    return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
 
   function formatarEndereco(texto?: string | null) {
     if (!texto) return "-";
-
     return texto
       .replace(/\s+/g, " ")
       .replace(/(\d)([A-Z]{2,})/g, "$1 $2")
@@ -604,13 +519,9 @@ export default function DeliveryReports() {
             Carregando relatórios, aguarde...
           </div>
         </div>
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
-            <div
-              key={index}
-              className="rounded-3xl border border-[#e9ebf3] bg-white p-6 shadow-sm"
-            >
+            <div key={index} className="rounded-3xl border border-[#e9ebf3] bg-white p-6 shadow-sm">
               <div className="animate-pulse space-y-4">
                 <div className="h-4 w-24 rounded bg-gray-200" />
                 <div className="h-10 w-32 rounded bg-gray-200" />
@@ -624,55 +535,33 @@ export default function DeliveryReports() {
   }
 
   return (
-    <div className="space-y-6 bg-[#f6f7fb]">
+    <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
         <div>
-          <h1 className="text-5xl font-bold tracking-tight text-[#20275b]">
+          <h1 className="text-4xl font-bold tracking-tight text-[#20275b] xl:text-5xl">
             Relatórios de Entregas
           </h1>
-          <p className="mt-2 text-lg text-[#7b82a8]">
-            Importe planilhas da empresa e filtre as entregas por cidade,
-            status, data e busca textual.
+          <p className="mt-2 text-base text-[#7b82a8] xl:text-lg">
+            Importe planilhas da empresa e filtre as entregas por cidade, status, data e busca textual.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <label
-            htmlFor="input-planilha"
-            className="flex h-12 cursor-pointer items-center gap-2 rounded-2xl border border-[#e1e4ef] bg-white px-5 text-sm font-medium text-[#20275b] shadow-sm hover:bg-[#fafbff]"
-          >
+          <label htmlFor="input-planilha" className="flex h-12 cursor-pointer items-center gap-2 rounded-2xl border border-[#e1e4ef] bg-white px-5 text-sm font-medium text-[#20275b] shadow-sm hover:bg-[#fafbff]">
             <FileSpreadsheet size={16} />
-            Selecionar planilha
+            {arquivo ? arquivo.name : "Selecionar planilha"}
           </label>
 
-          <input
-            id="input-planilha"
-            type="file"
-            accept=".xlsx,.csv"
-            className="hidden"
-            onChange={(e) => setArquivo(e.target.files?.[0] || null)}
-          />
+          <input id="input-planilha" type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => setArquivo(e.target.files?.[0] || null)} />
 
-          <button
-            onClick={importarArquivo}
-            disabled={uploading || loading}
-            className="flex h-12 items-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {uploading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Upload size={16} />
-            )}
+          <button onClick={importarArquivo} disabled={uploading || loading} className="flex h-12 items-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
             {uploading ? "Importando..." : "Importar planilha"}
           </button>
 
-          <button
-            onClick={exportarEntregas}
-            disabled={loading}
-            className="flex h-12 items-center gap-2 rounded-2xl border border-[#e1e4ef] bg-white px-5 text-sm font-medium text-[#20275b] shadow-sm hover:bg-[#fafbff] disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <button onClick={exportarEntregas} disabled={loading} className="flex h-12 items-center gap-2 rounded-2xl border border-[#e1e4ef] bg-white px-5 text-sm font-medium text-[#20275b] shadow-sm hover:bg-[#fafbff] disabled:cursor-not-allowed disabled:opacity-60">
             <Download size={16} />
-            Exportar relatório
+            {entregasSelecionadas.length > 0 ? `Exportar selecionados (${entregasSelecionadas.length})` : "Exportar relatório"}
           </button>
         </div>
       </div>
@@ -683,54 +572,19 @@ export default function DeliveryReports() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-green-600">
               <FileSpreadsheet className="h-7 w-7" />
             </div>
-
             <div>
               <p className="text-sm text-[#7b82a8]">Planilha ativa</p>
-              <h3 className="text-lg font-semibold text-[#20275b]">
-                {planilhaAtiva}
-              </h3>
+              <h3 className="text-lg font-semibold text-[#20275b]">{planilhaAtiva}</h3>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-[#7b82a8]">
-              Importado em {new Date().toLocaleDateString("pt-BR")} às{" "}
-              {new Date().toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-
-            <span className="rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-700">
-              Sucesso
-            </span>
-
-            <button
-              onClick={selecionarTodasPlanilhas}
-              disabled={arquivosUnicos.length === 0 || loading}
-              className="rounded-xl border border-[#e1e4ef] bg-white px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"
-            >
-              Selecionar todas
-            </button>
-
-            <button
-              onClick={limparSelecaoPlanilhas}
-              disabled={arquivosSelecionados.length === 0 || loading}
-              className="rounded-xl border border-[#e1e4ef] bg-white px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"
-            >
-              Limpar seleção
-            </button>
-
-            <button
-              onClick={handleApagar}
-              disabled={deleting || uploading || loading}
-              className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700 hover:bg-red-100 disabled:opacity-60"
-            >
-              {deleting ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Trash2 size={18} />
-              )}
+            <span className="text-sm text-[#7b82a8]">Importado em {new Date().toLocaleDateString("pt-BR")}</span>
+            <span className="rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-700">Sucesso</span>
+            <button onClick={selecionarTodasPlanilhas} disabled={arquivosUnicos.length === 0 || loading} className="rounded-xl border border-[#e1e4ef] bg-white px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60">Selecionar todas</button>
+            <button onClick={limparSelecaoPlanilhas} disabled={arquivosSelecionados.length === 0 || loading} className="rounded-xl border border-[#e1e4ef] bg-white px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60">Limpar seleção</button>
+            <button onClick={handleApagar} disabled={deleting || uploading || loading} className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700 hover:bg-red-100 disabled:opacity-60">
+              {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             </button>
           </div>
         </div>
@@ -738,161 +592,58 @@ export default function DeliveryReports() {
         {arquivosUnicos.length > 0 && (
           <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {arquivosUnicos.map((nomeArquivo) => (
-              <label
-                key={nomeArquivo}
-                className="flex items-center gap-3 rounded-2xl border border-[#e9ebf3] p-3 hover:bg-[#fafbff]"
-              >
-                <input
-                  type="checkbox"
-                  checked={arquivosSelecionados.includes(nomeArquivo)}
-                  onChange={() => toggleArquivo(nomeArquivo)}
-                  disabled={loading}
-                />
-                <span className="truncate text-sm text-[#20275b]">
-                  {nomeArquivo}
-                </span>
+              <label key={nomeArquivo} className="flex items-center gap-3 rounded-2xl border border-[#e9ebf3] p-3 hover:bg-[#fafbff]">
+                <input type="checkbox" checked={arquivosSelecionados.includes(nomeArquivo)} onChange={() => toggleArquivo(nomeArquivo)} disabled={loading} />
+                <span className="truncate text-sm text-[#20275b]">{nomeArquivo}</span>
               </label>
             ))}
           </div>
         )}
       </div>
 
-      {mensagem && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          {mensagem}
-        </div>
-      )}
-
-      {erro && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {erro}
-        </div>
-      )}
-
+      {mensagem && <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{mensagem}</div>}
+      {erro && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
       {loading && (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          <div className="flex items-center gap-2">
-            <Loader2 size={16} className="animate-spin" />
-            Carregando relatórios, aguarde...
-          </div>
+          <div className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" />Carregando relatórios, aguarde...</div>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Valor Total"
-          value={formatarValor(dados?.financeiro?.valorTotal ?? 0)}
-          subtitle="Faturamento total"
-          icon={<DollarSign className="h-6 w-6" />}
-          iconClassName="bg-violet-100 text-violet-600"
-        />
-        <StatCard
-          title="Ticket Médio"
-          value={formatarValor(dados?.financeiro?.ticketMedio ?? 0)}
-          subtitle="Média por entrega"
-          icon={<Wallet className="h-6 w-6" />}
-          iconClassName="bg-blue-100 text-blue-600"
-        />
-        <StatCard
-          title="Maior Entrega"
-          value={formatarValor(dados?.financeiro?.maiorEntrega ?? 0)}
-          subtitle="Maior valor"
-          icon={<TrendingUp className="h-6 w-6" />}
-          iconClassName="bg-green-100 text-green-600"
-          valueClassName="text-green-600"
-        />
-        <StatCard
-          title="Menor Entrega"
-          value={formatarValor(dados?.financeiro?.menorEntrega ?? 0)}
-          subtitle="Menor valor"
-          icon={<TrendingDown className="h-6 w-6" />}
-          iconClassName="bg-fuchsia-100 text-fuchsia-600"
-          valueClassName="text-violet-700"
-        />
+        <StatCard title="Valor Total" value={formatarValor(dados?.financeiro?.valorTotal ?? 0)} subtitle="Faturamento total" icon={<DollarSign className="h-6 w-6" />} iconClassName="bg-violet-100 text-violet-600" />
+        <StatCard title="Ticket Médio" value={formatarValor(dados?.financeiro?.ticketMedio ?? 0)} subtitle="Média por entrega" icon={<Wallet className="h-6 w-6" />} iconClassName="bg-blue-100 text-blue-600" />
+        <StatCard title="Maior Entrega" value={formatarValor(dados?.financeiro?.maiorEntrega ?? 0)} subtitle="Maior valor" icon={<TrendingUp className="h-6 w-6" />} iconClassName="bg-green-100 text-green-600" valueClassName="text-green-600" />
+        <StatCard title="Menor Entrega" value={formatarValor(dados?.financeiro?.menorEntrega ?? 0)} subtitle="Menor valor" icon={<TrendingDown className="h-6 w-6" />} iconClassName="bg-fuchsia-100 text-fuchsia-600" valueClassName="text-violet-700" />
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total de Entregas"
-          value={dados?.stats.totalEntregas ?? 0}
-          subtitle="Resultado filtrado"
-          icon={<Package className="h-6 w-6" />}
-          iconClassName="bg-violet-100 text-violet-600"
-        />
-        <StatCard
-          title="Entregues"
-          value={dados?.stats.entregues ?? 0}
-          subtitle="Concluídas"
-          icon={<CheckCircle2 className="h-6 w-6" />}
-          iconClassName="bg-green-100 text-green-600"
-          valueClassName="text-green-600"
-        />
-        <StatCard
-          title="Em Rota"
-          value={dados?.stats.emRota ?? 0}
-          subtitle="Em andamento"
-          icon={<Truck className="h-6 w-6" />}
-          iconClassName="bg-blue-100 text-blue-600"
-          valueClassName="text-blue-600"
-        />
-        <StatCard
-          title="Pendentes"
-          value={dados?.stats.pendentes ?? 0}
-          subtitle="Aguardando"
-          icon={<Clock3 className="h-6 w-6" />}
-          iconClassName="bg-orange-100 text-orange-600"
-          valueClassName="text-orange-500"
-        />
+        <StatCard title="Total de Entregas" value={dados?.stats.totalEntregas ?? 0} subtitle="Resultado filtrado" icon={<Package className="h-6 w-6" />} iconClassName="bg-violet-100 text-violet-600" />
+        <StatCard title="Entregues" value={dados?.stats.entregues ?? 0} subtitle="Concluídas" icon={<CheckCircle2 className="h-6 w-6" />} iconClassName="bg-green-100 text-green-600" valueClassName="text-green-600" />
+        <StatCard title="Em Rota" value={dados?.stats.emRota ?? 0} subtitle="Em andamento" icon={<Truck className="h-6 w-6" />} iconClassName="bg-blue-100 text-blue-600" valueClassName="text-blue-600" />
+        <StatCard title="Pendentes" value={dados?.stats.pendentes ?? 0} subtitle="Aguardando" icon={<Clock3 className="h-6 w-6" />} iconClassName="bg-orange-100 text-orange-600" valueClassName="text-orange-500" />
       </div>
 
       <div className="rounded-3xl border border-[#e9ebf3] bg-white p-5 shadow-sm">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#20275b]">
-              Buscar
-            </label>
+            <label className="mb-2 block text-sm font-medium text-[#20275b]">Buscar</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa1bf]" />
-              <input
-                type="text"
-                placeholder="Buscar por código, endereço, cidade..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                disabled={loading}
-                className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white pl-10 pr-3 text-sm outline-none disabled:opacity-60"
-              />
+              <input type="text" placeholder="Buscar por código, endereço, cidade..." value={busca} onChange={(e) => setBusca(e.target.value)} disabled={loading} className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white pl-10 pr-3 text-sm outline-none disabled:opacity-60" />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#20275b]">
-              Cidade
-            </label>
-            <select
-              value={cidade}
-              onChange={(e) => setCidade(e.target.value)}
-              disabled={loading}
-              className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 text-sm outline-none disabled:opacity-60"
-            >
+            <label className="mb-2 block text-sm font-medium text-[#20275b]">Cidade</label>
+            <select value={cidade} onChange={(e) => setCidade(e.target.value)} disabled={loading} className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 text-sm outline-none disabled:opacity-60">
               <option value="">Todas as cidades</option>
-              {cidades.map((cidadeItem) => (
-                <option key={cidadeItem} value={cidadeItem}>
-                  {cidadeItem}
-                </option>
-              ))}
+              {cidades.map((cidadeItem) => <option key={cidadeItem} value={cidadeItem}>{cidadeItem}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#20275b]">
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              disabled={loading}
-              className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 text-sm outline-none disabled:opacity-60"
-            >
+            <label className="mb-2 block text-sm font-medium text-[#20275b]">Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={loading} className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 text-sm outline-none disabled:opacity-60">
               <option value="">Todos os status</option>
               <option value="ENTREGUE">Entregue</option>
               <option value="EM_ROTA">Em Rota</option>
@@ -902,93 +653,45 @@ export default function DeliveryReports() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#20275b]">
-              Data inicial
-            </label>
+            <label className="mb-2 block text-sm font-medium text-[#20275b]">Data inicial</label>
             <div className="relative">
-              <input
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                disabled={loading}
-                className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 pr-10 text-sm outline-none disabled:opacity-60"
-              />
+              <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} disabled={loading} className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 pr-10 text-sm outline-none disabled:opacity-60" />
               <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa1bf]" />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#20275b]">
-              Data final
-            </label>
+            <label className="mb-2 block text-sm font-medium text-[#20275b]">Data final</label>
             <div className="relative">
-              <input
-                type="date"
-                value={dataFim}
-                onChange={(e) => setDataFim(e.target.value)}
-                disabled={loading}
-                className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 pr-10 text-sm outline-none disabled:opacity-60"
-              />
+              <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} disabled={loading} className="h-12 w-full rounded-2xl border border-[#e1e4ef] bg-white px-3 pr-10 text-sm outline-none disabled:opacity-60" />
               <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa1bf]" />
             </div>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3">
-          <button
-            onClick={limparFiltros}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm font-medium text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"
-          >
-            <Filter size={15} />
-            Limpar filtros
-          </button>
-
-          <button className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">
-            Aplicar filtros
-          </button>
+          <button onClick={limparFiltros} disabled={loading} className="flex items-center gap-2 rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm font-medium text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"><Filter size={15} />Limpar filtros</button>
+          <button type="button" className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">Aplicar filtros</button>
         </div>
       </div>
 
       <div className="rounded-3xl border border-[#e9ebf3] bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-[#20275b]">
-              Entregas Recentes
-            </h2>
-            <p className="text-[#7b82a8]">
-              Lista de entregas encontradas ({entregas.length} resultados)
-            </p>
+            <h2 className="text-2xl font-semibold text-[#20275b]">Entregas Recentes</h2>
+            <p className="text-[#7b82a8]">Lista de entregas encontradas ({entregas.length} resultados)</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={selecionarTodasEntregas}
-              disabled={entregas.length === 0 || loading}
-              className="rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"
-            >
-              Selecionar todas
-            </button>
-
-            <button
-              onClick={limparSelecaoEntregas}
-              disabled={entregasSelecionadas.length === 0 || loading}
-              className="rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60"
-            >
-              Limpar seleção
-            </button>
+            <button onClick={selecionarTodasEntregas} disabled={entregas.length === 0 || loading} className="rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60">Selecionar todas</button>
+            <button onClick={limparSelecaoEntregas} disabled={entregasSelecionadas.length === 0 || loading} className="rounded-xl border border-[#e1e4ef] px-4 py-2 text-sm text-[#20275b] hover:bg-[#fafbff] disabled:opacity-60">Limpar seleção</button>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-[#646680]">
-            <Loader2 size={18} className="animate-spin" />
-            Buscando informações dos relatórios...
-          </div>
+          <div className="flex items-center justify-center gap-2 py-10 text-[#646680]"><Loader2 size={18} className="animate-spin" />Buscando informações dos relatórios...</div>
         ) : entregas.length === 0 ? (
-          <div className="py-10 text-center text-[#646680]">
-            Nenhuma entrega encontrada com os filtros selecionados.
-          </div>
+          <div className="py-10 text-center text-[#646680]">Nenhuma entrega encontrada com os filtros selecionados.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border-separate border-spacing-y-3">
@@ -1004,79 +707,17 @@ export default function DeliveryReports() {
                   <th className="px-3 text-right font-medium">Ações</th>
                 </tr>
               </thead>
-
               <tbody>
                 {entregas.map((entrega) => (
-                  <tr
-                    key={entrega.id}
-                    className="rounded-2xl bg-[#fbfcff] shadow-sm"
-                  >
-                    <td className="rounded-l-2xl px-3 py-4 align-middle">
-                      <input
-                        type="checkbox"
-                        checked={entregasSelecionadas.includes(entrega.id)}
-                        onChange={() => toggleEntrega(entrega.id)}
-                        disabled={loading}
-                      />
-                    </td>
-
-                    <td className="px-3 py-4 align-middle">
-                      <div>
-                        <p className="font-medium text-[#20275b]">
-                          {entrega.codigo || "Sem código"}
-                        </p>
-                        <p className="mt-1 text-xs text-[#9aa1bf]">
-                          {formatarEndereco(entrega.endereco)}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-3 py-4 align-middle text-[#5a6286]">
-                      {entrega.cidade || "-"}
-                    </td>
-
-                    <td className="px-3 py-4 align-middle">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                          entrega.status,
-                        )}`}
-                      >
-                        {formatarStatus(entrega.status)}
-                      </span>
-                    </td>
-
-                    <td className="px-3 py-4 align-middle font-medium text-[#20275b]">
-                      {formatarValor(entrega.valorEntrega)}
-                    </td>
-
-                    <td className="px-3 py-4 align-middle">
-                      <div className="text-[#5a6286]">
-                        <p>{entrega.entregadorNome || "-"}</p>
-                        <p className="mt-1 text-xs text-[#9aa1bf]">
-                          {entrega.entregadorTelefone || "-"}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-3 py-4 align-middle text-[#5a6286]">
-                      <div>
-                        <p>{formatarData(entrega.dataEntrega)}</p>
-                        <p className="mt-1 text-xs text-[#9aa1bf]">
-                          {formatarHorario(entrega.dataEntrega)}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="rounded-r-2xl px-3 py-4 align-middle">
-                      <div className="flex justify-end gap-2">
-                        <button className="rounded-xl border border-[#e1e4ef] bg-white p-2 text-[#5a6286] hover:bg-[#f4f6ff]">
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button className="rounded-xl border border-[#e1e4ef] bg-white p-2 text-[#5a6286] hover:bg-[#f4f6ff]">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                  <tr key={entrega.id} className="rounded-2xl bg-[#fbfcff] shadow-sm">
+                    <td className="rounded-l-2xl px-3 py-4 align-middle"><input type="checkbox" checked={entregasSelecionadas.includes(entrega.id)} onChange={() => toggleEntrega(entrega.id)} disabled={loading} /></td>
+                    <td className="px-3 py-4 align-middle"><div><p className="font-medium text-[#20275b]">{entrega.codigo || "Sem código"}</p><p className="mt-1 max-w-[340px] truncate text-xs text-[#9aa1bf]">{formatarEndereco(entrega.endereco)}</p></div></td>
+                    <td className="px-3 py-4 align-middle text-[#5a6286]">{entrega.cidade || "-"}</td>
+                    <td className="px-3 py-4 align-middle"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(entrega.status)}`}>{formatarStatus(entrega.status)}</span></td>
+                    <td className="px-3 py-4 align-middle font-medium text-[#20275b]">{formatarValor(entrega.valorEntrega)}</td>
+                    <td className="px-3 py-4 align-middle"><div className="text-[#5a6286]"><p>{entrega.entregadorNome || "-"}</p><p className="mt-1 text-xs text-[#9aa1bf]">{entrega.entregadorTelefone || "-"}</p></div></td>
+                    <td className="px-3 py-4 align-middle text-[#5a6286]"><div><p>{formatarData(entrega.dataEntrega)}</p><p className="mt-1 text-xs text-[#9aa1bf]">{formatarHorario(entrega.dataEntrega)}</p></div></td>
+                    <td className="rounded-r-2xl px-3 py-4 align-middle"><div className="flex justify-end gap-2"><button className="rounded-xl border border-[#e1e4ef] bg-white p-2 text-[#5a6286] hover:bg-[#f4f6ff]"><Eye className="h-4 w-4" /></button><button className="rounded-xl border border-[#e1e4ef] bg-white p-2 text-[#5a6286] hover:bg-[#f4f6ff]"><MoreVertical className="h-4 w-4" /></button></div></td>
                   </tr>
                 ))}
               </tbody>

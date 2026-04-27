@@ -436,10 +436,16 @@ export class AdminService {
     });
 
     if (!atestado) {
-      throw new NotFoundException("Atestado não encontrado.");
-    }
+  throw new NotFoundException("Atestado não encontrado.");
+}
 
-    const atualizado = await this.prisma.atestados.update({
+if (atestado.status === "APROVADO" || atestado.status === "REJEITADO") {
+  throw new BadRequestException(
+    "Este atestado já foi analisado e não pode ser alterado novamente.",
+  );
+}
+
+const atualizado = await this.prisma.atestados.update({
       where: { id: BigInt(id) },
       data: {
         status: body.status,

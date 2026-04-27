@@ -20,41 +20,37 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
 
-useEffect(() => {
-  const savedUser = localStorage.getItem("user");
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
 
-  if (savedUser) {
-    const parsedUser: UserData = JSON.parse(savedUser);
+    if (savedUser) {
+      const parsedUser: UserData = JSON.parse(savedUser);
+      setUserData(parsedUser);
+      setIsLoggedIn(true);
+    }
+  }, []);
 
-    setUserData(parsedUser);
+  const handleLogin = (user: UserData) => {
+    if (user.token) {
+      localStorage.setItem("token", user.token);
+    } else if (user.accessToken) {
+      localStorage.setItem("token", user.accessToken);
+    }
+
+    localStorage.setItem("user", JSON.stringify(user));
+    setUserData(user);
     setIsLoggedIn(true);
-  }
-}, []);
+  };
 
-const handleLogin = (user: UserData) => {
-  // garante que o token não se perde
-  if (user.token) {
-    localStorage.setItem("token", user.token);
-  } else if (user.accessToken) {
-    localStorage.setItem("token", user.accessToken);
-  }
-
-  localStorage.setItem("user", JSON.stringify(user));
-
-  setUserData(user);
-  setIsLoggedIn(true);
-};
-
-const handleLogout = () => {
-  localStorage.removeItem("user");
-  localStorage.removeItem("token"); 
-
-  setIsLoggedIn(false);
-  setUserData(null);
-};
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    setUserData(null);
+  };
 
   return (
-    <div className="size-full bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-[#f6f7fb] text-slate-900 antialiased">
       {!isLoggedIn || !userData ? (
         <LoginScreen onLogin={handleLogin} />
       ) : userData.isAdmin ? (
