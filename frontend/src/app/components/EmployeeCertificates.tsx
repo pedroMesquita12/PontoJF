@@ -6,7 +6,10 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(
+  /\/+$/,
+  "",
+);
 
 function getToken() {
   return localStorage.getItem("token");
@@ -53,6 +56,7 @@ export function EmployeeCertificates() {
   const [items, setItems] = useState<Atestado[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [openingId, setOpeningId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -80,6 +84,25 @@ export function EmployeeCertificates() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const abrirArquivoAtestado = async (id: number) => {
+    try {
+      setOpeningId(id);
+      setError("");
+
+      const data = await apiFetch(`/ponto/me/atestados/${id}/arquivo`);
+
+      if (!data?.url) {
+        throw new Error("Link do arquivo não retornado pelo servidor.");
+      }
+
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao abrir arquivo.");
+    } finally {
+      setOpeningId(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,15 +286,16 @@ export function EmployeeCertificates() {
                   <p>Dias: {item.dias ?? "Não informado"}</p>
                   <p>Arquivo: {item.nomeArquivo || "Não informado"}</p>
                   <p>{item.observacoes || "Sem observações"}</p>
+
                   {item.arquivoUrl && (
-                    <a
-                      href={`${API_URL}${item.arquivoUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block text-sm text-violet-600 hover:underline"
+                    <button
+                      type="button"
+                      onClick={() => abrirArquivoAtestado(item.id)}
+                      disabled={openingId === item.id}
+                      className="inline-block text-sm text-violet-600 hover:underline disabled:opacity-60"
                     >
-                      Abrir arquivo
-                    </a>
+                      {openingId === item.id ? "Abrindo..." : "Abrir arquivo"}
+                    </button>
                   )}
                 </div>
               </CardContent>

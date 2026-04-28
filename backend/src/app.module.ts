@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { AdminModule } from './admin/admin.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
+import { PacotesModule } from './pacotes/pacotes.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { RelatoriosModule } from './relatorios/relatorios.module';
     }),
     PontoModule,
     RelatoriosModule,
+    PacotesModule,
     AuthModule,
     WhatsappModule,
     AdminModule,

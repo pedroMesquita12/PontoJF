@@ -35,7 +35,7 @@ type LoginScreenProps = {
   onLogin: (user: UserData) => void;
 };
 
-const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 function isAdminUser(perfil?: string) {
   return (perfil || "").toUpperCase().trim() === "DONO";

@@ -6,6 +6,8 @@ import {
 import { tipo_registro_ponto } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WhatsappService } from "../whatsapp/whatsapp.service";
+import { createClient } from "@supabase/supabase-js";
+import { extname } from "path";
 
 type LocalPermitido = {
   nome: string;
@@ -20,6 +22,71 @@ export class PontoService {
     private readonly prisma: PrismaService,
     private readonly whatsappService: WhatsappService,
   ) {}
+
+  private sanitizeFilename(filename: string) {
+    return String(filename || "arquivo")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 80);
+  }
+
+  private getSupabaseStorageClient() {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("SUPABASE_URL ou SUPABASE_SERVICE_KEY não configurados");
+    }
+
+    return createClient(supabaseUrl, supabaseServiceKey);
+  }
+
+  private async uploadAtestadoSupabase(
+    funcionarioId: bigint,
+    arquivo: Express.Multer.File,
+  ) {
+    const supabase = this.getSupabaseStorageClient();
+    const bucket = process.env.SUPABASE_ATESTADOS_BUCKET || "atestados";
+
+    const extensao =
+      extname(arquivo.originalname || "").toLowerCase() || ".bin";
+    const nomeOriginalSemExtensao = (
+      arquivo.originalname || "atestado"
+    ).replace(extname(arquivo.originalname || ""), "");
+
+    const nomeSeguro = this.sanitizeFilename(nomeOriginalSemExtensao);
+    const path = `funcionario_${funcionarioId.toString()}_${Date.now()}_${nomeSeguro}${extensao}`;
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, arquivo.buffer, {
+        contentType: arquivo.mimetype,
+        upsert: false,
+      });
+
+    if (error || !data?.path) {
+      throw new BadRequestException(
+        error?.message || "Não foi possível enviar o atestado.",
+      );
+    }
+
+    const { data: signedUrlData, error: signedUrlError } =
+      await supabase.storage.from(bucket).createSignedUrl(data.path, 60 * 60);
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      throw new BadRequestException(
+        signedUrlError?.message || "Não foi possível gerar a URL do atestado.",
+      );
+    }
+
+    return {
+      path: data.path,
+      signedUrl: signedUrlData.signedUrl,
+    };
+  }
 
   private readonly locaisPermitidos: LocalPermitido[] = [
     {
@@ -137,20 +204,24 @@ export class PontoService {
   }
 
   private async buscarFuncionarioPorUsuario(user: any) {
-    const usuarioId = BigInt(user?.usuarioId || user?.sub);
+  const usuarioId = user?.usuarioId;
 
-    const funcionario = await this.prisma.funcionarios.findFirst({
-      where: {
-        usuario_id: usuarioId,
-      },
-    });
-
-    if (!funcionario) {
-      throw new NotFoundException("Funcionário não encontrado.");
-    }
-
-    return funcionario;
+  if (!usuarioId) {
+    throw new NotFoundException("Usuário não encontrado no token.");
   }
+
+  const funcionario = await this.prisma.funcionarios.findFirst({
+    where: {
+      usuario_id: BigInt(usuarioId),
+    },
+  });
+
+  if (!funcionario) {
+    throw new NotFoundException("Funcionário não encontrado no banco.");
+  }
+
+  return funcionario;
+}
 
   async registrarPonto(
     funcionarioId: number,
@@ -366,7 +437,9 @@ export class PontoService {
     const agrupado = new Map<string, any[]>();
 
     for (const registro of registros) {
-      const data = new Date(registro.data_referencia).toISOString().split("T")[0];
+      const data = new Date(registro.data_referencia)
+        .toISOString()
+        .split("T")[0];
       if (!agrupado.has(data)) {
         agrupado.set(data, []);
       }
@@ -431,7 +504,9 @@ export class PontoService {
       tipo: item.tipo,
       motivo: item.motivo,
       descricao: item.descricao || "",
-      dataAdvertencia: new Date(item.data_advertencia).toISOString().split("T")[0],
+      dataAdvertencia: new Date(item.data_advertencia)
+        .toISOString()
+        .split("T")[0],
     }));
   }
 
@@ -457,38 +532,86 @@ export class PontoService {
   }
 
   async enviarAtestado(user: any, body: any, arquivo?: Express.Multer.File) {
-  const funcionario = await this.buscarFuncionarioPorUsuario(user);
+    const funcionario = await this.buscarFuncionarioPorUsuario(user);
 
-  if (!body?.data_inicio || !body?.data_fim) {
-    throw new BadRequestException(
-      'Data de início e data de fim são obrigatórias.',
-    );
+    if (!body?.data_inicio || !body?.data_fim) {
+      throw new BadRequestException(
+        "Data de início e data de fim são obrigatórias.",
+      );
+    }
+
+    if (!arquivo) {
+      throw new BadRequestException("O arquivo do atestado é obrigatório.");
+    }
+
+    const dataInicio = new Date(`${body.data_inicio}T00:00:00`);
+    const dataFim = new Date(`${body.data_fim}T00:00:00`);
+
+    if (Number.isNaN(dataInicio.getTime()) || Number.isNaN(dataFim.getTime())) {
+      throw new BadRequestException("Datas do atestado inválidas.");
+    }
+
+    if (dataFim < dataInicio) {
+      throw new BadRequestException(
+        "A data final não pode ser anterior à data inicial.",
+      );
+    }
+
+    const upload = await this.uploadAtestadoSupabase(funcionario.id, arquivo);
+
+    const criado = await this.prisma.atestados.create({
+      data: {
+        funcionario_id: funcionario.id,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        dias: body.dias ? Number(body.dias) : null,
+        cid: body.cid || null,
+        observacoes: body.observacoes || null,
+        arquivo_url: upload.path,
+        nome_arquivo: arquivo.originalname,
+        status: "PENDENTE",
+      },
+    });
+
+    return {
+      id: Number(criado.id),
+      arquivoUrl: upload.signedUrl,
+      message: "Atestado enviado com sucesso.",
+    };
   }
+  async gerarLinkAtestado(user: any, atestadoId: number) {
+    const funcionario = await this.buscarFuncionarioPorUsuario(user);
 
-  if (!arquivo) {
-    throw new BadRequestException('O arquivo do atestado é obrigatório.');
+    const atestado = await this.prisma.atestados.findFirst({
+      where: {
+        id: BigInt(atestadoId),
+        funcionario_id: funcionario.id,
+      },
+    });
+
+    if (!atestado) {
+      throw new NotFoundException("Atestado não encontrado.");
+    }
+
+    if (!atestado.arquivo_url) {
+      throw new BadRequestException("Este atestado não possui arquivo.");
+    }
+
+    const supabase = this.getSupabaseStorageClient();
+    const bucket = process.env.SUPABASE_ATESTADOS_BUCKET || "atestados";
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(atestado.arquivo_url, 60 * 60);
+
+    if (error || !data?.signedUrl) {
+      throw new BadRequestException(
+        error?.message || "Não foi possível gerar o link do arquivo.",
+      );
+    }
+
+    return {
+      url: data.signedUrl,
+    };
   }
-
-  const dataInicio = new Date(`${body.data_inicio}T00:00:00`);
-  const dataFim = new Date(`${body.data_fim}T00:00:00`);
-
-  const criado = await this.prisma.atestados.create({
-    data: {
-      funcionario_id: funcionario.id,
-      data_inicio: dataInicio,
-      data_fim: dataFim,
-      dias: body.dias ? Number(body.dias) : null,
-      cid: body.cid || null,
-      observacoes: body.observacoes || null,
-      arquivo_url: `/uploads/atestados/${arquivo.filename}`,
-      nome_arquivo: arquivo.originalname,
-      status: 'PENDENTE',
-    },
-  });
-
-  return {
-    id: Number(criado.id),
-    message: 'Atestado enviado com sucesso.',
-  };
-}
 }

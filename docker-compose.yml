@@ -1,22 +1,20 @@
-version: "3.9"
-
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
     container_name: logicontrol_backend
-    restart: always
-    env_file:
-      - ./backend/.env
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/.env
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: "https://shiny-broccoli-v6w9xwgpr6rvhxrv9-3000.app.github.dev"
     container_name: logicontrol_frontend
-    restart: always
-    env_file:
-      - ./frontend/.env
-    depends_on:
-      - backend
     ports:
       - "5173:80"
+    depends_on:
+      - backend

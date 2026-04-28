@@ -243,7 +243,9 @@ export function TimeClockApp({
     try {
       setIsLoadingEntries(true);
 
-      const response = await fetch(`/api/ponto/${funcionarioId}`);
+     const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
+
+const response = await fetch(`${API_URL}/ponto/${funcionarioId}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -384,7 +386,7 @@ export function TimeClockApp({
   ) => {
     const { latitude, longitude, accuracy } = await obterLocalizacaoPrecisa();
 
-    const response = await fetch(`/api/ponto/registrar`, {
+    const response = await fetch(`${API_URL}/ponto/registrar`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

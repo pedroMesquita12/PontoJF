@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Req,
   UploadedFile,
@@ -11,17 +12,9 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { PontoService } from './ponto.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-
-function sanitizeFilename(filename: string) {
-  return filename
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9.-]/g, '_');
-}
 
 @Controller('ponto')
 export class PontoController {
@@ -47,15 +40,13 @@ export class PontoController {
     );
   }
 
-  @Get(':funcionarioId')
-  listar(@Param('funcionarioId') funcionarioId: string) {
-    const id = Number(funcionarioId);
-
-    if (Number.isNaN(id)) {
-      throw new BadRequestException('funcionarioId inválido');
-    }
-
-    return this.pontoService.listarPontos(id);
+  @UseGuards(JwtAuthGuard)
+  @Get('me/atestados/:id/arquivo')
+  async gerarLinkAtestado(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.pontoService.gerarLinkAtestado(req.user, id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -80,15 +71,7 @@ export class PontoController {
   @Post('me/atestados')
   @UseInterceptors(
     FileInterceptor('arquivo', {
-      storage: diskStorage({
-        destination: './uploads/atestados',
-        filename: (_req, file, callback) => {
-          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          const extension = extname(file.originalname);
-          const baseName = sanitizeFilename(file.originalname.replace(extension, ''));
-          callback(null, `${baseName}-${uniqueSuffix}${extension}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (_req, file, callback) => {
         const allowed = [
           'application/pdf',
@@ -118,5 +101,16 @@ export class PontoController {
     @Body() body: any,
   ) {
     return this.pontoService.enviarAtestado(req.user, body, arquivo);
+  }
+
+  @Get(':funcionarioId')
+  listar(@Param('funcionarioId') funcionarioId: string) {
+    const id = Number(funcionarioId);
+
+    if (Number.isNaN(id)) {
+      throw new BadRequestException('funcionarioId inválido');
+    }
+
+    return this.pontoService.listarPontos(id);
   }
 }

@@ -37,7 +37,7 @@ type Employee = {
   ultimaSaida?: string;
 };
 
-const API_URL = "/api";
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 export function EmployeeTimeRecords() {
   const [searchTerm, setSearchTerm] = useState("");

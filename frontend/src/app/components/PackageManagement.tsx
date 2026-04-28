@@ -28,9 +28,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:3000"
-).replace(/\/+$/, "");
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 type PackageStatus = "RECEBIDO" | "EM_ROTA" | "ENTREGUE" | "CANCELADO";
 type PackagePriority = "NORMAL" | "URGENTE" | "EXPRESSA";

@@ -16,7 +16,10 @@ export class MatriculaGuard implements CanActivate {
       throw new UnauthorizedException('Usuário não autenticado');
     }
 
-    if (user.matricula !== 'JF003') {
+    const perfil = String(user.perfil || '').trim().toUpperCase();
+    const perfisPermitidos = ['DONO', 'ADMIN', 'GERENTE', 'SUPERVISOR'];
+
+    if (!perfisPermitidos.includes(perfil)) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar relatórios',
       );

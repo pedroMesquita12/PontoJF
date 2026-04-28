@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import * as bcrypt from "bcrypt";
-import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import { status_funcionario, tipo_perfil } from "@prisma/client";
 
 type TipoRegistro = "ENTRADA" | "SAIDA" | "SAIDA_ALMOCO" | "VOLTA_ALMOCO";
@@ -48,7 +48,10 @@ export type UpdateFuncionarioDto = Partial<CreateFuncionarioDto>;
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService,  private readonly whatsappService: WhatsappService,) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly whatsappService: WhatsappService,
+  ) {}
 
   private sanitizeDigits(value?: string | null) {
     return String(value || "").replace(/\D/g, "");
@@ -380,7 +383,7 @@ export class AdminService {
     return this.mapFuncionarioCrud(funcionario);
   }
 
-      async listarAtestadosAdmin() {
+  async listarAtestadosAdmin() {
     const atestados = await this.prisma.atestados.findMany({
       include: {
         funcionarios: {
@@ -436,16 +439,16 @@ export class AdminService {
     });
 
     if (!atestado) {
-  throw new NotFoundException("Atestado não encontrado.");
-}
+      throw new NotFoundException("Atestado não encontrado.");
+    }
 
-if (atestado.status === "APROVADO" || atestado.status === "REJEITADO") {
-  throw new BadRequestException(
-    "Este atestado já foi analisado e não pode ser alterado novamente.",
-  );
-}
+    if (atestado.status === "APROVADO" || atestado.status === "REJEITADO") {
+      throw new BadRequestException(
+        "Este atestado já foi analisado e não pode ser alterado novamente.",
+      );
+    }
 
-const atualizado = await this.prisma.atestados.update({
+    const atualizado = await this.prisma.atestados.update({
       where: { id: BigInt(id) },
       data: {
         status: body.status,
